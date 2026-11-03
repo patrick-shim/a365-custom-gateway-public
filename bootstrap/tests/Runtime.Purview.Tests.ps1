@@ -68,12 +68,18 @@ $module = Get-Module RuntimePurview
     $script:publishCalls = 0
     $script:dotnetPublishCalls = 0
     $script:triggerCalls = 0
+    $script:ownedTask = $null
+    $script:disabledTask = $null
     function script:Get-RepositoryRoot { $script:testRoot }
-    function script:Get-ScheduledTask { return $null }
+    function script:Get-ScheduledTask { return $script:ownedTask }
+    function script:Disable-ScheduledTask { param([string]$TaskName) $script:disabledTask = $TaskName }
     function script:Invoke-BootstrapCommand {
         param([string]$FilePath, [object[]]$ArgumentList)
         if ($FilePath -ne 'dotnet') { throw "Unexpected bootstrap command: $FilePath" }
-        if ($ArgumentList[0] -eq 'publish') { $script:dotnetPublishCalls++; return '' }
+        if ($ArgumentList[0] -eq 'publish') {
+            if ($script:ownedTask -and $script:disabledTask -ne $script:registeredTask.TaskName) { throw 'Recovery was not suspended before binary replacement.' }
+            $script:dotnetPublishCalls++; return ''
+        }
         if ([IO.Path]::GetFileName([string]$ArgumentList[0]) -eq 'Gateway.Purview.CatalogHost.dll') {
             if ($ArgumentList.Count -ne 8 -or $ArgumentList[1] -ne '--publish-bootstrap') {
                 throw 'Bootstrap catalog publication did not use the synchronous managed assembly mode.'
@@ -160,6 +166,18 @@ $module = Get-Module RuntimePurview
         if ([Convert]::FromBase64String([IO.File]::ReadAllText($keyPath).Trim()).Length -ne 32) {
             throw 'Purview connector transport key was not preserved as a 32-byte secret.'
         }
+        $keyBefore = [IO.File]::ReadAllText($keyPath)
+        $script:ownedTask = [pscustomobject]@{
+            Actions=@($script:registeredTask.Action); Principal=$script:registeredTask.Principal
+            Description=$script:registeredTask.Description; State='Ready'
+        }
+        $updated = Start-RuntimePurviewCatalogHost -Identity $identity -InitialCatalog $catalog
+        if ($script:disabledTask -ne $result.taskName -or $script:startedTask -ne $result.taskName -or
+            $updated.connectorInstanceId -ne $result.connectorInstanceId -or
+            [IO.File]::ReadAllText($keyPath) -cne $keyBefore) {
+            throw 'Owned listener update changed identity/key or failed to suspend and restore supervision.'
+        }
+
     } finally {
         if (Test-Path -LiteralPath $script:testRoot) { Remove-Item -LiteralPath $script:testRoot -Recurse -Force }
     }

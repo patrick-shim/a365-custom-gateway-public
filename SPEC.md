@@ -57,6 +57,9 @@ Scheduler ignores duplicate starts and permits an unlimited running lifetime; th
 recovery trigger restores a stopped listener even when native failure retries do
 not run. Native retries remain configured three times one minute apart. Recovery
 never starts a separate shell or creates a provider refresh.
+Before replacing host binaries, bootstrap disables the verified owned task so
+recovery cannot launch partially replaced files. Successful registration reenables
+the task; a failed replacement remains disabled until explicit repair.
 Provider children run with no console window and non-interactive authentication.
 Idle heartbeat is not a catalog refresh. A separate tray interface or Windows service
 is not required. The Console is the management and liveness surface. Recovery must

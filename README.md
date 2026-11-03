@@ -267,6 +267,8 @@ windowless listener only when it is not already running; duplicate starts are
 ignored. This does not launch a PowerShell window or refresh the catalog. Native
 failure retries are also configured. Persistent failures require repair through
 the Console's connection diagnostics.
+Bootstrap disables the owned task during binary replacement and reenables it
+after successful installation, preventing recovery from racing an upgrade.
 The Console reports its heartbeat, so a separate tray application is unnecessary.
 After restarting Windows, sign in to that account to restore the connector. Signing
 out stops this user-scoped component; Docker runtime protection is independent of

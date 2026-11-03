@@ -68,6 +68,8 @@ visible window. Provider PowerShell children are invisible and liveness appears
 in the Console. Recovery does not create provider work; permanent certificate or
 configuration errors still require repair. This user-session background lifetime
 is the accepted local experience.
+Owned recovery triggers are suspended during binary replacement and restored
+only after successful installation.
 An always-on service before Windows sign-in remains deferred with M6 below.
 
 ## M6 — Server/cloud connector (deferred)

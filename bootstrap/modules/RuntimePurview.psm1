@@ -289,6 +289,9 @@ function Start-RuntimePurviewCatalogHost {
             throw 'The existing Purview task is not the exact owned catalog host; refusing replacement.'
         }
     }
+    # Suspend only the verified owned task while replacing its binaries. A failed
+    # installation stays disabled until repair rather than starting partial files.
+    if ($registered) { Disable-ScheduledTask -TaskName $taskName | Out-Null }
     if ($registered -and $registered.State -eq 'Running') {
         Stop-ScheduledTask -TaskName $taskName
         $stopDeadline = [DateTime]::UtcNow.AddSeconds(10)

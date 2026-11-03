@@ -70,7 +70,9 @@ lifetime. A Windows service that runs before sign-in is not part of this release
 
 Before repairing or replacing the host, verify the task's exact executable path,
 working directory, account and ownership description. Reconcile accepted work and
-wait for active provider operations before stopping it. Preserve its certificate,
+wait for active provider operations before stopping it. Disable the verified owned
+task before replacing binaries so the recovery trigger cannot race the update;
+reenable it after a successful replacement. Preserve its certificate,
 connector ID, transport key and queue directories. Do not rerun initial catalog
 publication merely to update binaries. A listener restart can resume accepted work;
 it must not create a new refresh or repeat an unconfirmed assignment blindly.
