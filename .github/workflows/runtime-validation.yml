@@ -47,7 +47,7 @@ jobs:
       - name: Build Docker images with the bootstrap engine
         shell: pwsh
         run: |
-          foreach ($module in @('Common', 'Experience', 'Runtime')) {
+          foreach ($module in @('Common', 'Experience', 'Prerequisites', 'Azure', 'Entra', 'Agent365', 'Runtime', 'RuntimePurview', 'Lifecycle')) {
             Import-Module "./bootstrap/modules/$module.psm1" -DisableNameChecking
           }
           $config = Get-Content bootstrap/config.example.runtime.json -Raw | ConvertFrom-Json
@@ -56,7 +56,7 @@ jobs:
       - name: Start isolated runtime with synthetic identity configuration
         shell: pwsh
         run: |
-          foreach ($module in @('Common', 'Experience', 'Runtime')) {
+          foreach ($module in @('Common', 'Experience', 'Prerequisites', 'Azure', 'Entra', 'Agent365', 'Runtime', 'RuntimePurview', 'Lifecycle')) {
             Import-Module "./bootstrap/modules/$module.psm1" -DisableNameChecking
           }
           $config = Get-Content bootstrap/config.example.runtime.json -Raw | ConvertFrom-Json
@@ -97,9 +97,34 @@ jobs:
           "${dc[@]}" exec -T postgres psql -U gateway -d gateway -c 'CREATE TABLE validation_marker (value text); INSERT INTO validation_marker VALUES ('"'retained'"');'
           "${dc[@]}" up -d --force-recreate api worker console
           cd ../..
-          pwsh -NoProfile -Command 'foreach ($module in @("Common", "Experience", "Runtime")) { Import-Module "./bootstrap/modules/$module.psm1" -DisableNameChecking }; Test-GatewayRuntimeHealth -HealthUrl http://127.0.0.1:5080/health -ReadyUrl http://127.0.0.1:5080/health/ready -ConsoleConfigUrl http://127.0.0.1:5081/config.js -ConsoleProxyHealthUrl http://127.0.0.1:5081/health'
+          pwsh -NoProfile -Command 'foreach ($module in @("Common", "Experience", "Prerequisites", "Azure", "Entra", "Agent365", "Runtime", "RuntimePurview", "Lifecycle")) { Import-Module "./bootstrap/modules/$module.psm1" -DisableNameChecking }; Test-GatewayRuntimeHealth -HealthUrl http://127.0.0.1:5080/health -ReadyUrl http://127.0.0.1:5080/health/ready -ConsoleConfigUrl http://127.0.0.1:5081/config.js -ConsoleProxyHealthUrl http://127.0.0.1:5081/health'
           cd deploy/runtime
           test "$("${dc[@]}" exec -T postgres psql -U gateway -d gateway -tAc 'SELECT value FROM validation_marker')" = retained
+
+      - name: Verify S3 content storage
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: gateway
+          AWS_SECRET_ACCESS_KEY: gatewaysecret
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_EC2_METADATA_DISABLED: 'true'
+        run: |
+          bucket="gateway-validation-${GITHUB_RUN_ID}"
+          aws --endpoint-url http://127.0.0.1:9000 s3api create-bucket --bucket "$bucket"
+          printf 'synthetic content storage check' > "$RUNNER_TEMP/content.txt"
+          aws --endpoint-url http://127.0.0.1:9000 s3api put-object --bucket "$bucket" --key validation.txt --body "$RUNNER_TEMP/content.txt"
+          aws --endpoint-url http://127.0.0.1:9000 s3api get-object --bucket "$bucket" --key validation.txt "$RUNNER_TEMP/content-readback.txt"
+          cmp "$RUNNER_TEMP/content.txt" "$RUNNER_TEMP/content-readback.txt"
+          aws --endpoint-url http://127.0.0.1:9000 s3api delete-object --bucket "$bucket" --key validation.txt
+          aws --endpoint-url http://127.0.0.1:9000 s3api delete-bucket --bucket "$bucket"
+
+      - name: Verify worker credential directory access
+        shell: bash
+        run: |
+          cd deploy/runtime
+          dc=(docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.apps.yml)
+          "${dc[@]}" exec -T worker bash -c 'set -eu; probe=/app/blueprint-credentials/.validation-write; printf synthetic > "$probe"; rm "$probe"'
+          "${dc[@]}" exec -T api bash -c 'test -r /app/blueprint-credentials && ! test -w /app/blueprint-credentials'
 
       - name: Show container diagnostics on failure
         if: failure()

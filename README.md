@@ -163,7 +163,9 @@ Install:
   frontend development; the terminal installer builds frontend images in Docker
 - Python 3.11 or later only for the optional Python samples
 
-Deployment also requires access to the selected Microsoft tenant and authority to
+Each installer uses its own Microsoft tenant, service licenses/entitlements, and
+Azure subscription when provisioning Content Safety. No author-owned tenant or
+credentials are included or required. Deployment requires authority to
 create or configure the reviewed applications and permissions. Agent 365 Registry
 confirmation uses delegated administrator access; Purview management has separate
 certificate and role requirements. Review the [bootstrap guide](bootstrap/README.md)
@@ -477,11 +479,13 @@ builds the images from public package feeds on a fresh Linux runner. It uses the
 same bootstrap image-build, environment-generation, deployment, and health-check
 functions as the installer, with synthetic identities and Microsoft provisioning
 disabled. It checks API readiness, Console proxying, worker queue consumption,
-OpenAPI, and isolated PostgreSQL/RabbitMQ regressions.
+OpenAPI, isolated PostgreSQL/RabbitMQ regressions, S3 read/write, and the worker
+credential directory.
 
 This check establishes container runtime readiness only. Full README acceptance
-also requires clean Windows terminal and graphical setup in a dedicated Microsoft
-tenant, administrator sign-in, agent registration, and provider-backed protection.
+also requires clean Windows terminal and graphical setup using an operator-selected
+Microsoft tenant and dedicated test resources, administrator sign-in, agent
+registration, and provider-backed protection.
 See [release gates](SPEC-VNEXT.md#m7--release-validation). A passing container check
 does not establish tenant eligibility or Purview/Agent 365 enforcement.
 

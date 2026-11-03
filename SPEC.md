@@ -13,7 +13,9 @@ tracked in [SPEC-VNEXT.md](SPEC-VNEXT.md).
 
 Container runtime validation exercises the installer build, environment generation,
 deployment, and health checks with synthetic identities and no Microsoft mutations.
-It does not replace the tenant-backed installation and protection release gates.
+Each operator selects their own tenant and service access; author-owned credentials
+are never required. Validation does not replace tenant-backed installation and
+protection release gates.
 
 ## 1. Purpose
 

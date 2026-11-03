@@ -79,7 +79,8 @@ policy or broaden assignment scope as part of hosting changes.
 The Docker runtime workflow covers public-feed image builds, synthetic local
 configuration, readiness, queue consumption, API documentation, and isolated data
 service regressions. It does not run Microsoft provisioning, Windows setup, or
-live protection checks. Those gates remain unverified until separately exercised.
+live protection checks. Those gates use the operator-selected tenant and dedicated
+test resources and remain unverified until separately exercised.
 
 The following evidence is required before claiming the corresponding capability:
 
