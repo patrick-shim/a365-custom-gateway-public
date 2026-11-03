@@ -718,6 +718,15 @@ visibility.
 
 ### 12.2 Standalone Python live-agent sample
 
+Windows Flask requests use a per-request Proactor event loop that adds
+`CREATE_NO_WINDOW` and hidden startup settings to subprocess launches, including
+Azure Identity's async CLI/PowerShell credential helpers. The process-wide event
+loop policy and SDK functions are unchanged. Credential selection, scopes,
+timeouts, cancellation, per-turn cleanup and fail-closed protection are preserved.
+Linux and macOS keep the standard request event loop. The optional Windows task
+continues to launch `pythonw.exe`; interactive login is an explicit setup action,
+never a hidden automatic sign-in attempt during a model request.
+
 The repository includes an optional external-agent beta sample under
 `samples/python-foundry-weather-agent/`. It is outside the Gateway runtime and
 Gateway Docker Compose topology. For every test run, the operator enters an exact valid

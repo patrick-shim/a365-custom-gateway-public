@@ -431,6 +431,9 @@ There is no default identity. The Gateway rejects a mismatched ID/key pair befor
 Foundry or MCP runs; changing the ID clears the volatile conversation. Foundry
 uses the developer or managed identity through Azure Identity, with credentials
 kept in the server process.
+On Windows, request-scoped credential helpers run without console windows. The
+optional logon task uses `pythonw.exe` so both the sample and its authentication
+children stay in the background. Initial `az login` remains an explicit setup step.
 
 **Local beta exception:** the sample saves the selected ID and key in
 browser `localStorage`, restores them after reload, and offers a clear action.

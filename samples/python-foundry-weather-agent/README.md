@@ -372,7 +372,15 @@ The installer validates the sample virtual environment and `.env`, registers one
 logon-only task for this exact checkout, and starts it immediately. Its action is
 the virtual environment's `pythonw.exe` running `app.py` directly with the sample
 directory as the working directory. It has no repeating trigger, PowerShell/cmd
-wrapper, elevation, or visible terminal. Check or remove it with:
+wrapper, elevation, or visible terminal. Each Windows request also uses a private
+Proactor event loop that starts Azure Identity credential subprocesses with
+`CREATE_NO_WINDOW` and hidden startup settings. This prevents the Azure CLI or
+PowerShell token request from briefly opening a console when the model is called.
+The Azure credential chain and token scope remain unchanged. If developer login
+expires, run `az login` explicitly from your own terminal; the sample does not open
+an interactive login window on your behalf. Linux and macOS are unchanged.
+
+Check or remove the Windows task with:
 
 ```powershell
 pwsh -NoProfile -File tools/scripts/setup/Set-WeatherAgentSampleStartup.ps1 -Mode Status
@@ -429,6 +437,12 @@ authority for exact startup options. The sample fails startup with a sanitized
 configuration message when a required server-side value is absent.
 
 ## Tests
+
+`tests/test_background_async.py` includes native Windows subprocess checks and a
+synthetic Azure CLI credential exchange. These tests launch child processes with
+no console, preserve output/exit behavior and check per-request loop cleanup.
+Windows-only cases are skipped on other platforms; they do not contact Azure or
+use real credentials.
 
 From this sample directory, activate the virtual environment created above and
 install the test requirements:

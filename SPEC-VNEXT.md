@@ -60,6 +60,14 @@ assignment alone is not a claim of tested enforcement or downstream visibility.
 No service-hosting or M6 connector changes are included. Source-revision labels
 allow comparison between public source and local application images.
 
+## Sample credential subprocesses
+
+The standalone Flask sample keeps Windows request-scoped authentication subprocesses
+windowless through its own Proactor event loop. This covers model-token acquisition
+as well as the existing `pythonw.exe` startup. Native Windows regression tests check
+actual child console attachment, the installed Azure CLI credential path and
+request-loop cleanup. No credential-chain replacement or global SDK patch is used.
+
 ## Windows background lifetime
 
 The supported beta already uses a windowless executable supervised by a single

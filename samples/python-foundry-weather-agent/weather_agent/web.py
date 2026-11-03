@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from flask import Flask, Response, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from .background_async import run_background
 from .config import (
     AppConfig,
     validate_external_agent_id,
@@ -22,7 +23,7 @@ from .workflow import AgentWorkflow, ChatResult, Stage, parse_history, validate_
 
 
 def _run(coroutine: Any) -> Any:
-    return asyncio.run(coroutine)
+    return run_background(coroutine)
 
 
 def _is_loopback_request_host(value: str) -> bool:
