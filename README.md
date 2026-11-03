@@ -159,8 +159,8 @@ Install:
 - Docker Desktop or Docker Engine with the Compose plugin and Linux containers
 - Azure CLI
 - Bicep CLI when bootstrap provisions Content Safety (`az bicep install`)
-- Node.js 20 and npm only for local frontend development; Docker image builds
-  install frontend dependencies themselves
+- Node.js 20 and npm for the graphical installer (`gateway.cmd gui`) or local
+  frontend development; the terminal installer builds frontend images in Docker
 - Python 3.11 or later only for the optional Python samples
 
 Deployment also requires access to the selected Microsoft tenant and authority to
@@ -469,6 +469,21 @@ enforcement or downstream Microsoft visibility.
 | `tests/` | Executable regression and opt-in integration checks |
 | `tools/scripts/` | Setup, diagnostics, maintenance, and explicit live probes |
 | `docs/`, `operations/` | Detailed design and operating guidance |
+
+## Installation validation
+
+The [Docker runtime validation workflow](.github/workflows/runtime-validation.yml)
+builds the images from public package feeds on a fresh Linux runner. It uses the
+same bootstrap image-build, environment-generation, deployment, and health-check
+functions as the installer, with synthetic identities and Microsoft provisioning
+disabled. It checks API readiness, Console proxying, worker queue consumption,
+OpenAPI, and isolated PostgreSQL/RabbitMQ regressions.
+
+This check establishes container runtime readiness only. Full README acceptance
+also requires clean Windows terminal and graphical setup in a dedicated Microsoft
+tenant, administrator sign-in, agent registration, and provider-backed protection.
+See [release gates](SPEC-VNEXT.md#m7--release-validation). A passing container check
+does not establish tenant eligibility or Purview/Agent 365 enforcement.
 
 ## Develop and validate
 

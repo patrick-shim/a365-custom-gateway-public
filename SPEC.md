@@ -11,6 +11,10 @@ This specification describes the implemented product. Development and validation
 practices are maintained in [CONTRIBUTING.md](CONTRIBUTING.md); deferred work is
 tracked in [SPEC-VNEXT.md](SPEC-VNEXT.md).
 
+Container runtime validation exercises the installer build, environment generation,
+deployment, and health checks with synthetic identities and no Microsoft mutations.
+It does not replace the tenant-backed installation and protection release gates.
+
 ## 1. Purpose
 
 A365 Custom Gateway is an identity, protection, observability, and administration
