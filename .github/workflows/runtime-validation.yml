@@ -28,6 +28,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/scripts/maintenance/Test-RepositoryLayout.ps1
+          ./bootstrap/tests/Runtime.Directory.Tests.ps1
           chmod +x ./gateway
           ./gateway --help
           if ($LASTEXITCODE -ne 0) { throw 'Launcher failed.' }
@@ -124,6 +125,8 @@ jobs:
           cd deploy/runtime
           dc=(docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.apps.yml)
           "${dc[@]}" exec -T worker bash -c 'set -eu; test "$(id -u)" != 0; umask 077; printf synthetic > /app/blueprint-credentials/.validation-write'
+          # Repeating preparation must preserve an existing credential file.
+          pwsh -NoProfile -Command 'foreach ($module in @("Common", "Experience", "Prerequisites", "Azure", "Entra", "Agent365", "Runtime", "RuntimePurview", "Lifecycle")) { Import-Module "../../bootstrap/modules/$module.psm1" -DisableNameChecking }; $config = Get-Content ../../bootstrap/config.example.runtime.json -Raw | ConvertFrom-Json; Deploy-GatewayRuntime -Config $config -EnvFile (Join-Path (Get-Location) ".env.runtime")'
           "${dc[@]}" exec -T api bash -c 'set -eu; test "$(id -u)" != 0; test "$(cat /app/blueprint-credentials/.validation-write)" = synthetic; ! test -w /app/blueprint-credentials'
           "${dc[@]}" exec -T worker rm /app/blueprint-credentials/.validation-write
 

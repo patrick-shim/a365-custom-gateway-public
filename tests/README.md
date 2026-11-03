@@ -116,3 +116,7 @@ Missing integration configuration prints **skipped**, never a claimed live pass.
 The explicit live Purview probe is
 `tools/scripts/diagnostics/Test-GatewayAgentDlp.ps1`; it exits unsuccessfully unless
 both the normal allow and DLP-specific sensitive block are observed.
+
+The Docker runtime workflow also runs `bootstrap/tests/Runtime.Directory.Tests.ps1`
+on Linux and checks real worker write/API read-only credential access, including
+repeated directory preparation with an existing synthetic file.
