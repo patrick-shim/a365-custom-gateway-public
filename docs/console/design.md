@@ -52,6 +52,14 @@ Policy assignment distinguishes applying, assigned, needs-attention, failure and
 
 API keys are visible once and are not retained in query caches. Role-aware controls supplement server authorization. Search cursors and operation identifiers come from the server. Failed or uncertain mutations must not display fabricated success.
 
+Purview assignment and inline activation are separate. After a new target is
+assigned, Microsoft may still return only offline processing while distributing
+the policy. Required prompt DLP rejects that state with `PURVIEW_INLINE_SCOPE_NOT_READY`
+(HTTP 503), issues no allow receipt, and does not permit a model call. The Console
+shows Waiting for Purview activation rather than a generic failed test. It does
+not automatically resubmit content or require a manual protection-verification
+form. A later request recomputes offline-only scopes instead of caching them.
+
 ## Assignment review freshness
 
 Review assignment requests a catalog refresh, shows bounded progress, and prepares

@@ -84,6 +84,14 @@ native application images; an emulated .NET startup is not an accepted substitut
 for the host architecture check. The existing x64 S3 development dependency uses
 compatibility support on ARM hosts and remains separate from application builds.
 
+Purview assignment and inline activation are separate. After a new target is
+assigned, Microsoft may still return only offline processing while distributing
+the policy. Required prompt DLP rejects that state with `PURVIEW_INLINE_SCOPE_NOT_READY`
+(HTTP 503), issues no allow receipt, and does not permit a model call. The Console
+shows Waiting for Purview activation rather than a generic failed test. It does
+not automatically resubmit content or require a manual protection-verification
+form. A later request recomputes offline-only scopes instead of caching them.
+
 ## 1. Purpose
 
 A365 Custom Gateway is an identity, protection, observability, and administration

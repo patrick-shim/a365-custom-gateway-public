@@ -143,7 +143,9 @@ export function AgentTestPanel({ agent, onClose }: { agent: TestAgent; onClose: 
                   ? "Partially succeeded — check each step"
                   : result.outcome === "Blocked"
                     ? "Blocked by protection"
-                    : "Test failed"}
+                    : result.outcome === "Pending"
+                      ? "Waiting for Purview activation"
+                      : "Test failed"}
             </Text>
           )}
           {error && <Text role="alert">{error}</Text>}

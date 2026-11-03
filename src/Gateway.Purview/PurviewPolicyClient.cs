@@ -160,6 +160,12 @@ public sealed partial class PurviewPolicyClient : IPurviewPolicyClient
                 "Purview returned an unsupported protection-scope execution mode.");
         }
 
+        if (activity == UploadText && interaction.ExecutionMode == PurviewExecutionMode.EvaluateInline && !requireInlineDecision)
+            throw new PurviewPolicyException(
+                "PURVIEW_INLINE_SCOPE_NOT_READY",
+                "Purview has not returned an inline protection scope for this agent.",
+                isTransient: true);
+
         var decision = await ProcessContentAsync(
             interaction,
             activity,

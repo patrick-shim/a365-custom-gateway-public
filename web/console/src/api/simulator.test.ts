@@ -70,3 +70,15 @@ it("rejects a receipt that does not match its evaluation before any further subm
   expect(result.outcome).toBe("Failed");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+it("reports pending Purview activation without resending content or claiming protection", async () => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+    errorCode: "PURVIEW_INLINE_SCOPE_NOT_READY", correlationId: receipt,
+  }), { status: 503 }));
+  const result = await simulateAgent(input, new AbortController().signal, () => {});
+  expect(result.outcome).toBe("Pending");
+  expect(result.steps[0].status).toBe("PendingPropagation");
+  expect(result.steps[0].detail).toContain("has not activated inline DLP");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(result)).not.toContain(input.apiKey);
+});

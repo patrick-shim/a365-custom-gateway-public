@@ -279,3 +279,11 @@ Use **Test Agent** on the Agents list or an active agent's detail page. The side
 The simulator calls `POST /api/v1/prompts:evaluate`, then `POST /api/v1/agent-activities`. If allowed, it also calls `POST /api/v1/ai-interactions` with the same prompt, interaction ID and evaluation receipt. The response is explicitly labeled as simulated; no model is invoked. Blocked prompts do not produce a simulated AI response. The gateway's configured Prompt Shields, Purview and observability paths execute normally, including configured blocked-prompt telemetry. Each request has its own idempotency key; uncertain requests are never automatically replayed.
 
 Results distinguish allowed, blocked, failed, partial and unconfirmed processing, with receipt/correlation IDs. HTTP acceptance or a pending export is **not** confirmation of downstream visibility. Agent 365, Purview AI Explorer and Defender delivery depend on the actual agent/deployment configuration and downstream processing. No direct Defender ingestion claim is made by this UI.
+
+### Inline Purview activation
+
+Purview assignment and inline activation are separate. After a new target is
+assigned, Microsoft may still return only offline processing while distributing
+the policy. Required prompt DLP rejects that state with `PURVIEW_INLINE_SCOPE_NOT_READY`
+(HTTP 503), issues no allow receipt, and does not permit a model call. Clients must distinguish this temporary readiness result from an allow or block.
+Content submissions are not automatically retried. A later request recomputes offline-only scopes instead of caching them.

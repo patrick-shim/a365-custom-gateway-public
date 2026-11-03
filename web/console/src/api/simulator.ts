@@ -39,13 +39,13 @@ const interactionSchema = z.object({
 });
 export type TestStep = {
   name: string;
-  status: "Running" | "Succeeded" | "Accepted" | "Blocked" | "Failed" | "Unconfirmed" | "Skipped";
+  status: "Running" | "Succeeded" | "Accepted" | "Blocked" | "Failed" | "Unconfirmed" | "Skipped" | "PendingPropagation";
   detail: string;
   reference?: string;
 };
 export type AgentTestResult = {
   runId: string;
-  outcome: "Succeeded" | "Blocked" | "Failed" | "Partial";
+  outcome: "Succeeded" | "Blocked" | "Failed" | "Partial" | "Pending";
   steps: TestStep[];
 };
 export const simulatedResponse =
@@ -56,6 +56,7 @@ export class TestRequestError extends Error {
     message: string,
     readonly uncertain = false,
     readonly reference?: string,
+    readonly waitingForPurview = false,
   ) {
     super(message);
   }
@@ -127,6 +128,8 @@ function failure(status: number, value: unknown): never {
       "Purview policy scope changed during the operation. Refresh the agent and retry after the current assignment is confirmed.",
     PROMPT_EVALUATION_INVALID:
       "The protection settings changed or their current policy scope could not be verified. Check Data protection and Purview connection diagnostics before retrying.",
+    PURVIEW_INLINE_SCOPE_NOT_READY:
+      "Purview has not activated inline DLP for this agent yet. After assignment, policy distribution can take time. Wait before testing again; no model call is allowed while activation is pending. No extra verification form is required.",
     PROMPT_EVALUATION_UNAVAILABLE:
       "A protection service could not complete the check. Check Prompt Shields and Purview connection diagnostics before retrying.",
   };
@@ -140,7 +143,8 @@ function failure(status: number, value: unknown): never {
     })
     .safeParse(value);
   if (problem.success && Object.hasOwn(messages, problem.data.errorCode))
-    throw new TestRequestError(messages[problem.data.errorCode], false, problem.data.correlationId);
+    throw new TestRequestError(messages[problem.data.errorCode], false, problem.data.correlationId,
+      problem.data.errorCode === "PURVIEW_INLINE_SCOPE_NOT_READY");
   const message =
     status === 401
       ? "API key rejected. Check that it is current and belongs to this agent."
@@ -222,7 +226,8 @@ export async function simulateAgent(
   const failed = (name: string, e: unknown) =>
     publish({
       name,
-      status: e instanceof TestRequestError && e.uncertain ? "Unconfirmed" : "Failed",
+      status: e instanceof TestRequestError && e.waitingForPurview ? "PendingPropagation"
+        : e instanceof TestRequestError && e.uncertain ? "Unconfirmed" : "Failed",
       detail:
         e instanceof TestRequestError
           ? e.message
@@ -252,7 +257,7 @@ export async function simulateAgent(
     });
   } catch (e) {
     failed("Prompt evaluation", e);
-    return { runId, outcome: "Failed", steps };
+    return { runId, outcome: e instanceof TestRequestError && e.waitingForPurview ? "Pending" : "Failed", steps };
   }
   publish({ name: "Activity telemetry", status: "Running", detail: "Submitting agent activity…" });
   try {

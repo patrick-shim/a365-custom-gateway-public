@@ -357,6 +357,10 @@ internal sealed class EvaluatePromptHandler : IRequestHandler<EvaluatePromptComm
                 agent.Id,
                 correlationId,
                 exception.FailureCode);
+            if (exception.FailureCode == ErrorCodes.PURVIEW_INLINE_SCOPE_NOT_READY)
+                throw new DomainException(
+                    "Purview inline protection is not active for this agent. After assignment, wait for Purview policy distribution before retrying. No allow receipt was issued.",
+                    ErrorCodes.PURVIEW_INLINE_SCOPE_NOT_READY);
             throw new DomainException("Purview could not return a trusted prompt decision.", ErrorCodes.PROMPT_EVALUATION_UNAVAILABLE);
         }
     }

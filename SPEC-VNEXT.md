@@ -39,6 +39,14 @@ the first assignment, that refresh failures cannot silently submit an old revisi
 and that saved-policy review remains explicitly available during outages. This is
 a correction to the current local workflow, not a deferred server/cloud milestone.
 
+Purview assignment and inline activation are separate. After a new target is
+assigned, Microsoft may still return only offline processing while distributing
+the policy. Required prompt DLP rejects that state with `PURVIEW_INLINE_SCOPE_NOT_READY`
+(HTTP 503), issues no allow receipt, and does not permit a model call. The Console
+shows Waiting for Purview activation rather than a generic failed test. It does
+not automatically resubmit content or require a manual protection-verification
+form. A later request recomputes offline-only scopes instead of caching them.
+
 ## Current release boundaries
 
 - Bootstrap publishes an initial verified catalog. Subsequent provider reads

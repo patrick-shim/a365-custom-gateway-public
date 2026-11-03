@@ -50,6 +50,16 @@ static class IndividualAssignmentChecks
         graph.Modified = false;
         graph.Block = true;
         Check((await client.EvaluatePromptAsync(input, default)).Decision == PurviewDecisionType.Blocked, "Sensitive block lost.");
+        graph.Block = false;
+        graph.Offline = true;
+        var freshTarget = input with { AgentIdentityClientId = Guid.NewGuid().ToString() };
+        var processedBefore = graph.ProcessCalls;
+        try { await client.EvaluatePromptAsync(freshTarget, default); throw new Exception("Offline scope accepted for inline enforcement."); }
+        catch (PurviewPolicyException e) when (e.FailureCode == "PURVIEW_INLINE_SCOPE_NOT_READY" && e.IsTransient) { }
+        Check(graph.ProcessCalls == processedBefore, "Content was submitted while inline scope was unavailable.");
+        graph.Offline = false;
+        Check((await client.EvaluatePromptAsync(freshTarget, default)).Decision == PurviewDecisionType.Allowed,
+            "An offline-only scope was cached and hid subsequent activation.");
         graph.Error = true;
         try { await client.EvaluatePromptAsync(input, default); throw new Exception("Processing errors allowed content."); }
         catch (PurviewPolicyException e) when (e.FailureCode == "PURVIEW_PROCESSING_ERROR") { }
@@ -62,6 +72,8 @@ static class IndividualAssignmentChecks
         public bool Error { get; set; }
         public bool Modified { get; set; }
         public bool RemoveInline { get; set; }
+        public bool Offline { get; set; }
+        public int ProcessCalls { get; private set; }
         public Task<PurviewGraphResponse> PostAsync(string operation, string path, JsonObject body, string? etag, CancellationToken ct, PurviewInteraction? identity = null)
         {
             if (identity?.UseAgentIdentity != true) throw new Exception("Explicit child token binding missing.");
@@ -70,8 +82,9 @@ static class IndividualAssignmentChecks
                 var target = body["locations"]![0]!["value"]!.GetValue<string>();
                 if (target != identity.AgentIdentityClientId) throw new Exception("Scope used blueprint instead of child.");
                 ScopeTargets.Add(target);
-                return Task.FromResult(new PurviewGraphResponse(JsonNode.Parse(RemoveInline ? "{\"value\":[]}" : "{\"value\":[{\"activities\":\"uploadText\",\"executionMode\":\"evaluateInline\",\"policyActions\":[]}]}")!.AsObject(), "\"scope\"", HttpStatusCode.OK));
+                return Task.FromResult(new PurviewGraphResponse(JsonNode.Parse(Offline ? "{\"value\":[{\"activities\":\"uploadText\",\"executionMode\":\"evaluateOffline\",\"policyActions\":[]}]}" : RemoveInline ? "{\"value\":[]}" : "{\"value\":[{\"activities\":\"uploadText\",\"executionMode\":\"evaluateInline\",\"policyActions\":[]}]}")!.AsObject(), "\"scope\"", HttpStatusCode.OK));
             }
+            ProcessCalls++;
             if (body["contentToProcess"]!["protectedAppMetadata"]!["applicationLocation"]!["value"]!.GetValue<string>() != identity.AgentIdentityClientId || etag != "\"scope\"")
                 throw new Exception("Process content target/ETag not bound.");
             var result = new JsonObject { ["protectionScopeState"]=Modified ? "modified" : "notModified", ["processingErrors"]=Error ? new JsonArray(new JsonObject { ["code"]="error" }) : new JsonArray(),
