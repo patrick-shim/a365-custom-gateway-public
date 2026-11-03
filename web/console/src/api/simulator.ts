@@ -51,7 +51,7 @@ export type AgentTestResult = {
 export const simulatedResponse =
   "Gateway Console simulation completed. This is a test response; no language model was called.";
 
-class TestRequestError extends Error {
+export class TestRequestError extends Error {
   constructor(
     message: string,
     readonly uncertain = false,
@@ -61,6 +61,11 @@ class TestRequestError extends Error {
   }
 }
 async function post(path: string, key: string, body: unknown, signal: AbortSignal) {
+  if (signal.aborted)
+    throw new TestRequestError(
+      "Verification cancelled. Submitted requests may already have completed.",
+      true,
+    );
   let response: Response;
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -148,6 +153,59 @@ function failure(status: number, value: unknown): never {
             : `Gateway request failed (HTTP ${status}). Check service health and the agent's settings.`;
   throw new TestRequestError(message, status >= 500);
 }
+export async function evaluateAgentPrompt(
+  input: {
+    externalAgentId: string;
+    apiKey: string;
+    prompt: string;
+    userObjectId: string;
+    interactionId?: string;
+  },
+  signal: AbortSignal,
+) {
+  const runId = input.interactionId ?? `beta-verification-${crypto.randomUUID()}`;
+  const common = {
+    externalAgentId: input.externalAgentId,
+    interactionId: runId,
+    occurredAtUtc: new Date().toISOString(),
+    userContext: { tenantUserObjectId: input.userObjectId },
+    prompt: { contentType: "text/plain", content: input.prompt },
+  };
+  const { response, value } = await post("/api/v1/prompts:evaluate", input.apiKey, common, signal);
+  const blocked = response.status === 403 ? blockedSchema.safeParse(value) : null;
+  const parsed = evaluationSchema.safeParse(
+    blocked?.success
+      ? {
+          ...blocked.data,
+          allowed: false,
+          evaluationReceiptId: null,
+          interactionId: runId,
+          decision: blocked.data.errorCode,
+          userMessage: "Prompt blocked",
+        }
+      : value,
+  );
+  if (!parsed.success) {
+    if (!response.ok) failure(response.status, value);
+    throw new TestRequestError(
+      "Prompt evaluation response is invalid. No simulated interaction was sent.",
+      true,
+    );
+  }
+  const evaluation = parsed.data;
+  if (
+    evaluation.interactionId !== runId ||
+    (evaluation.allowed
+      ? response.status !== 200 || evaluation.evaluationReceiptId !== evaluation.evaluationId
+      : response.status !== 403 || evaluation.evaluationReceiptId !== null)
+  )
+    throw new TestRequestError(
+      "Prompt evaluation did not match this test. No simulated interaction was sent.",
+      true,
+    );
+  return evaluation;
+}
+
 export async function simulateAgent(
   input: { externalAgentId: string; apiKey: string; prompt: string; userObjectId: string },
   signal: AbortSignal,
@@ -185,43 +243,7 @@ export async function simulateAgent(
     detail: "Checking the agent's current Prompt Shields and Purview settings…",
   });
   try {
-    const { response, value } = await post(
-      "/api/v1/prompts:evaluate",
-      input.apiKey,
-      common,
-      signal,
-    );
-    const blocked = response.status === 403 ? blockedSchema.safeParse(value) : null;
-    const parsed = evaluationSchema.safeParse(
-      blocked?.success
-        ? {
-            ...blocked.data,
-            allowed: false,
-            evaluationReceiptId: null,
-            interactionId: runId,
-            decision: blocked.data.errorCode,
-            userMessage: "Prompt blocked",
-          }
-        : value,
-    );
-    if (!parsed.success) {
-      if (!response.ok) failure(response.status, value);
-      throw new TestRequestError(
-        "Prompt evaluation response is invalid. No simulated interaction was sent.",
-        true,
-      );
-    }
-    evaluation = parsed.data;
-    if (
-      evaluation.interactionId !== runId ||
-      (evaluation.allowed
-        ? response.status !== 200 || !evaluation.evaluationReceiptId
-        : response.status !== 403)
-    )
-      throw new TestRequestError(
-        "Prompt evaluation did not match this test. No simulated interaction was sent.",
-        true,
-      );
+    evaluation = await evaluateAgentPrompt({ ...input, interactionId: runId }, signal);
     publish({
       name: "Prompt evaluation",
       status: evaluation.allowed ? "Succeeded" : "Blocked",

@@ -243,7 +243,7 @@ def test_gateway_route_trace_is_exact_accessible_and_responsive() -> None:
     assert ".stage-route { flex-basis: 100%; }" in stylesheet
 
 
-def test_demo_uses_accessible_burgundy_chrome_and_preserves_semantic_colors() -> None:
+def test_beta_uses_accessible_burgundy_chrome_and_preserves_semantic_colors() -> None:
     parser = _parse_controls()
     stylesheet = (SAMPLE_ROOT / "static" / "app.css").read_text(encoding="utf-8")
     variables = dict(

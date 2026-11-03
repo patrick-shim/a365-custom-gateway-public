@@ -27,6 +27,8 @@ FROM build AS publish
 RUN dotnet publish "Gateway.Provisioning.Worker.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
 WORKDIR /app
 COPY --from=publish /app/publish .
 ENV DOTNET_EnableDiagnostics=0

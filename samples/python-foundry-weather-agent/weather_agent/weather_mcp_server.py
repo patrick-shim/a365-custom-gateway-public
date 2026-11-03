@@ -170,7 +170,7 @@ async def fetch_current_weather(
     http_client: _HttpClient = client or httpx.AsyncClient(
         timeout=httpx.Timeout(resolved_timeout),
         follow_redirects=False,
-        headers={"Accept": "application/json", "User-Agent": "a365-weather-demo/1.0"},
+        headers={"Accept": "application/json", "User-Agent": "a365-weather-beta/1.0"},
     )
     try:
         async with asyncio.timeout(resolved_timeout):

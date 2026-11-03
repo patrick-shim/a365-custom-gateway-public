@@ -63,16 +63,16 @@ describe("Console routes with actual API envelopes", () => {
       pollingRecommended: false, percentComplete: 100, steps: registrationOperation.steps.map(x => ({ ...x, status: "Completed" })) }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
     const user = userEvent.setup();
-    await screen.findByRole("heading", { name: "Data protection for this agent" });
+    await screen.findByRole("heading", { name: "Select a Purview policy" });
     for (let i = 0; i < 4; i++) {
       const refresh = screen.getByRole("button", { name: "Refresh status" });
       await waitFor(() => expect(refresh).toBeEnabled());
       await user.click(refresh);
       await waitFor(() => expect(refresh).toBeEnabled());
       await user.click(screen.getByRole("tab", { name: "API key" }));
-      await user.click(screen.getByRole("tab", { name: "Data protection" }));
+      await user.click(screen.getByRole("tab", { name: "Protection setup" }));
       expect(screen.getAllByRole("region", { name: "Agent setup" })).toHaveLength(1);
-      expect(screen.getAllByRole("heading", { name: "Data protection for this agent" })).toHaveLength(1);
+      expect(screen.getAllByRole("heading", { name: "Select a Purview policy" })).toHaveLength(1);
     }
   });
   it("navigates through every menu page without losing the shell", async () => {
@@ -674,10 +674,10 @@ describe("Console routes with actual API envelopes", () => {
     renderApp("/data-protection");
     expect(await screen.findByText("Purview returned no policies for this tenant.")).toBeVisible();
     await userEvent.setup().click(await screen.findByRole("link", { name: agent.name }));
-    expect(await screen.findByRole("tab", { name: "Data protection" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tab", { name: "Protection setup" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(agent.agent365.agentId)).toBeVisible();
     expect(screen.queryByText(agent.agent365.blueprintId)).not.toBeInTheDocument();
-    expect(screen.queryByText("Gateway allow and block verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
     expect(server.requests.every(r => r.method === "GET")).toBe(true);
   });
 
@@ -685,7 +685,7 @@ describe("Console routes with actual API envelopes", () => {
     server.handlers.set(`GET /api/v1/agents/${agentId}`, () => ({ ...agent, features: { ...features, purviewEnabled: enabled } }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
     expect(await screen.findByText("No policies selected in this Console. Policies scoped elsewhere in Purview may still apply.")).toBeVisible();
-    expect(screen.queryByText("Gateway allow and block verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
     expect(screen.getByText(`Gateway content evaluation: ${enabled === true ? "Enabled · verification needed" : enabled === false ? "Not enabled" : "Not reported"}`)).toBeVisible();
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
   });
@@ -712,7 +712,7 @@ describe("Console routes with actual API envelopes", () => {
     expect(await screen.findByText("This assignment no longer matches the current verified catalog. Refresh the catalog, review the exact policy revision and agent scope, then apply it again if it is still appropriate.")).toBeVisible();
     expect(screen.getAllByText("Needs Attention")).toHaveLength(2);
     expect(screen.getByText("One or more saved assignments need review before enforcement can be verified")).toBeVisible();
-    expect(screen.queryByText("Gateway allow and block verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
   });
 
   it("directs an invalid assignment result to Catalog Host transport repair without suggesting resubmission", async () => {
@@ -761,12 +761,12 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByText(`Agent identity: ${agent.agent365.agentId}`)).toBeVisible();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Apply to this agent" }));
+    await user.click(screen.getByRole("button", { name: "Apply without verification" }));
     expect(await screen.findByText("Applying assignment")).toBeVisible();
     expect(screen.getByRole("progressbar", { name: "Applying assignment" })).toBeVisible();
     expect(screen.getByText(/Elapsed: 2m/)).toBeVisible();
     expect(screen.getByText(/Last checked/)).toBeVisible();
-    expect(screen.queryByText("Gateway allow and block verified")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review assignment" })).toBeDisabled();
     expect(server.requests.find(x => x.path.endsWith("/purview-policies/review"))?.body).toEqual({ policyId, revision });
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
@@ -775,7 +775,7 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Check assignment status" }));
     expect(await screen.findByText("Assigned", { exact: true })).toBeVisible();
     expect(screen.queryByRole("progressbar", { name: "Applying assignment" })).not.toBeInTheDocument();
-    expect(screen.getByText("Assigned · awaiting sync and gateway verification")).toBeVisible();
+    expect(screen.getByText("Assignment confirmed. Run verification to check protection; no verification is running automatically.")).toBeVisible();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
   });
 
@@ -860,7 +860,7 @@ describe("Console routes with actual API envelopes", () => {
     await screen.findByRole("option", { name: "Previous DLP" });
     await user.selectOptions(screen.getByLabelText("Choose an existing policy"), policyId);
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
-    expect(await screen.findByRole("button", { name: "Apply to this agent" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Apply without verification" })).toBeEnabled();
     const mutations = server.requests.filter(request => request.method === "POST");
     expect(mutations).toHaveLength(1);
     expect(mutations[0].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
@@ -930,8 +930,8 @@ describe("Console routes with actual API envelopes", () => {
       allowObservedAtUtc: new Date().toISOString(), blockObservedAtUtc: null,
       items: [{ operationId, policyId: operationId, policyName: "Existing DLP", status: "Assigned", failureCode: null, assignedAtUtc: new Date().toISOString() }] }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
-    expect(await screen.findByText("Assigned · awaiting sync and gateway verification")).toBeVisible();
-    expect(screen.queryByText("Gateway allow and block verified")).not.toBeInTheDocument();
+    expect(await screen.findByText("Assignment confirmed. Run verification to check protection; no verification is running automatically.")).toBeVisible();
+    expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
   });
 
   it("searches and paginates agents while preserving the server-side search", async () => {

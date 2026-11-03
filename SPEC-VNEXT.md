@@ -49,6 +49,15 @@ restart recovery, or downstream Microsoft-service visibility.
 - The Python samples and standalone policy-owner utility remain separate from
   Gateway runtime deployment and do not expand its policy-authoring authority.
 
+## Beta protection setup
+
+The current beta adds explicit browser-scoped Apply and verify and Verify protection
+runs using existing reviewed assignment and prompt-evaluation contracts. Bounded
+progress, cancellation, expected provider-specific blocks, current-state readback,
+and request-scoped credentials are acceptance gates. No service-hosting or M6
+connector changes are included. Source-revision labels allow comparison between
+public source and local application images.
+
 ## M6 — Server/cloud connector (deferred)
 
 Before implementation, demonstrate that the required Purview management operations

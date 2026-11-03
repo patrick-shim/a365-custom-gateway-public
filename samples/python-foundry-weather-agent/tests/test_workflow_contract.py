@@ -239,7 +239,7 @@ def test_gateway_errors_keep_the_attempted_request_descriptor(
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -262,7 +262,7 @@ def test_blocked_prompt_never_reaches_foundry_or_activity_submission() -> None:
             message="blocked input",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -286,7 +286,7 @@ def test_allowed_prompt_uses_exact_canonical_input_and_returns_after_intake() ->
             message="Weather in Seoul?",
             history=(ChatMessage("user", "Hello"), ChatMessage("assistant", "Hi")),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -297,7 +297,7 @@ def test_allowed_prompt_uses_exact_canonical_input_and_returns_after_intake() ->
     assert gateway.submitted_prompt == foundry.inputs[0].protection_text
     assert foundry.inputs[0].messages[0].role == "system"
     assert gateway.activities == ["InvokeAgent"]
-    assert gateway.external_agent_ids == ["demo-01"]
+    assert gateway.external_agent_ids == ["beta-01"]
     assert gateway.gateway_keys == [KEY]
     assert result.stages[-1].status == "accepted"
     assert gateway_requests(result) == [
@@ -321,7 +321,7 @@ def test_gateway_request_trace_uses_only_allowlisted_method_and_route_metadata()
             message=private_prompt,
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -351,7 +351,7 @@ def test_sequential_requests_keep_selected_agent_ids_request_scoped() -> None:
     foundry = FakeFoundry()
     selected_workflow = workflow(gateway, foundry)
 
-    for external_agent_id in ("Demo.Agent-01", "demo-agent-02"):
+    for external_agent_id in ("Beta.Agent-01", "beta-agent-02"):
         result = asyncio.run(
             selected_workflow.run_chat(
                 message="Weather in Seoul?",
@@ -363,7 +363,7 @@ def test_sequential_requests_keep_selected_agent_ids_request_scoped() -> None:
         )
         assert result.outcome == "allowed"
 
-    assert gateway.external_agent_ids == ["Demo.Agent-01", "demo-agent-02"]
+    assert gateway.external_agent_ids == ["Beta.Agent-01", "beta-agent-02"]
     assert gateway.gateway_keys == [KEY, KEY]
 
 
@@ -376,7 +376,7 @@ def test_prompt_only_evaluates_input_but_never_submits_completed_interaction() -
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
             prompt_evaluation_enabled=True,
             response_evaluation_enabled=False,
@@ -412,7 +412,7 @@ def test_evaluation_bypass_still_requires_admission_and_emits_agent_activities()
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
             prompt_evaluation_enabled=False,
             response_evaluation_enabled=False,
@@ -457,7 +457,7 @@ def test_response_evaluation_cannot_run_when_prompt_evaluation_is_off() -> None:
                 message="Weather in Seoul?",
                 history=(),
                 session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-                external_agent_id="demo-01",
+                external_agent_id="beta-01",
                 gateway_agent_key=KEY,
                 prompt_evaluation_enabled=False,
                 response_evaluation_enabled=True,
@@ -489,7 +489,7 @@ def test_purview_response_block_withholds_candidate_answer() -> None:
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -513,7 +513,7 @@ def test_failed_interaction_intake_is_not_mislabeled_as_a_purview_block() -> Non
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -537,7 +537,7 @@ def test_pre_model_activity_failure_stops_before_foundry() -> None:
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -572,7 +572,7 @@ def test_changed_protection_context_is_failed_not_blocked_and_prompts_retry() ->
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -605,7 +605,7 @@ def test_uncertain_pre_model_activity_stops_before_foundry() -> None:
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )
@@ -634,7 +634,7 @@ def test_expired_interaction_binding_is_reported_and_candidate_is_withheld() -> 
             message="Weather in Seoul?",
             history=(),
             session_id="59b7d10b-0785-4b43-a532-6f0c7a253855",
-            external_agent_id="demo-01",
+            external_agent_id="beta-01",
             gateway_agent_key=KEY,
         )
     )

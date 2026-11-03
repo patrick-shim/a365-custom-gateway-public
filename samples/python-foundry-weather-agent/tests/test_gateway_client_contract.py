@@ -76,7 +76,7 @@ def test_gateway_client_keeps_its_request_scoped_key_out_of_repr_and_errors() ->
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler),
     ) as client:
@@ -119,7 +119,7 @@ def test_gateway_client_readiness_uses_server_side_bearer_without_redirects() ->
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         client.readiness()
@@ -137,7 +137,7 @@ def test_gateway_client_evaluates_exact_prompt_and_validates_allow_receipt() -> 
         assert request.url.path == "/api/v1/prompts:evaluate"
         assert_gateway_headers(request)
         body = json.loads(request.content)
-        assert body["externalAgentId"] == "Demo.Agent-01"
+        assert body["externalAgentId"] == "Beta.Agent-01"
         assert body["interactionId"] == interaction_id
         assert body["prompt"] == {
             "contentType": "text/plain",
@@ -148,7 +148,7 @@ def test_gateway_client_evaluates_exact_prompt_and_validates_allow_receipt() -> 
 
     with GatewayClient(
         config(),
-        external_agent_id="Demo.Agent-01",
+        external_agent_id="Beta.Agent-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         result = client.evaluate_prompt(
@@ -170,7 +170,7 @@ def test_gateway_clients_keep_external_agent_ids_isolated_per_request() -> None:
         return allowed_evaluation(request, body["interactionId"])
 
     for index, external_agent_id in enumerate(
-        ("Demo.Agent-01", "demo-agent-02"), start=1
+        ("Beta.Agent-01", "beta-agent-02"), start=1
     ):
         with GatewayClient(
             config(),
@@ -182,7 +182,7 @@ def test_gateway_clients_keep_external_agent_ids_isolated_per_request() -> None:
                 interaction_id=f"turn-{index}", prompt="Weather in Seoul?"
             )
 
-    assert selected_ids == ["Demo.Agent-01", "demo-agent-02"]
+    assert selected_ids == ["Beta.Agent-01", "beta-agent-02"]
 
 
 def test_gateway_client_returns_typed_prompt_block_without_receipt() -> None:
@@ -202,7 +202,7 @@ def test_gateway_client_returns_typed_prompt_block_without_receipt() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         result = client.evaluate_prompt(interaction_id="blocked", prompt="synthetic")
@@ -242,7 +242,7 @@ def test_gateway_client_explains_agent_identity_and_state_failures_safely(
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler),
     ) as client:
@@ -275,7 +275,7 @@ def test_gateway_client_rejects_inconsistent_allow_receipts(mutation: dict) -> N
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayProtocolError):
@@ -291,7 +291,7 @@ def test_gateway_client_rejects_mismatched_evaluation_and_receipt_ids() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayProtocolError, match="identifiers did not match") as caught:
@@ -321,7 +321,7 @@ def test_gateway_client_never_authorizes_nonpermitted_purview_allow_state(
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayProtocolError, match="allow decision") as caught:
@@ -353,7 +353,7 @@ def test_gateway_client_accepts_documented_purview_allow_states(
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         result = client.evaluate_prompt(interaction_id="turn", prompt="hello")
@@ -369,7 +369,7 @@ def test_gateway_client_submits_tool_activity_and_matches_202_receipt() -> None:
         assert request.url.path == "/api/v1/agent-activities"
         assert_gateway_headers(request)
         body = json.loads(request.content)
-        assert body["externalAgentId"] == "demo-activity-02"
+        assert body["externalAgentId"] == "beta-activity-02"
         assert body["activityType"] == "ToolInvocation"
         assert body["actor"]["type"] == "User"
         assert body["tool"]["name"] == "get_weather"
@@ -387,7 +387,7 @@ def test_gateway_client_submits_tool_activity_and_matches_202_receipt() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-activity-02",
+        external_agent_id="beta-activity-02",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         receipt = client.submit_activity(
@@ -413,7 +413,7 @@ def test_unexpected_success_status_for_prompt_evaluation_is_unconfirmed() -> Non
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayRequestError) as caught:
@@ -442,7 +442,7 @@ def test_unexpected_success_status_for_activity_is_unconfirmed() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayRequestError) as caught:
@@ -481,7 +481,7 @@ def test_unexpected_success_status_for_interaction_is_unconfirmed() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(
@@ -522,7 +522,7 @@ def test_changed_protection_context_has_sanitized_retryable_error() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(
@@ -563,7 +563,7 @@ def test_malformed_mutation_receipt_preserves_reconciliation_key() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayProtocolError) as caught:
@@ -600,7 +600,7 @@ def test_gateway_client_withholds_failed_or_purview_blocked_interaction(
         assert request.url.path == "/api/v1/ai-interactions"
         assert_gateway_headers(request)
         body = json.loads(request.content)
-        assert body["externalAgentId"] == "demo-response-03"
+        assert body["externalAgentId"] == "beta-response-03"
         assert body["interactionId"] == interaction_id
         assert body["prompt"]["content"] == "hello"
         assert body["response"]["content"] == "candidate answer"
@@ -619,7 +619,7 @@ def test_gateway_client_withholds_failed_or_purview_blocked_interaction(
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-response-03",
+        external_agent_id="beta-response-03",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(
@@ -665,7 +665,7 @@ def test_gateway_client_withholds_interaction_with_skipped_purview_state(
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(
@@ -707,7 +707,7 @@ def test_gateway_client_fails_closed_on_unknown_interaction_status() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(
@@ -731,7 +731,7 @@ def test_gateway_client_refuses_prompt_changed_after_evaluation() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         evaluation = client.evaluate_prompt(interaction_id="turn", prompt="original")
@@ -754,7 +754,7 @@ def test_gateway_transport_error_never_echoes_key_prompt_or_provider_body() -> N
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayTransportError) as caught:
@@ -780,7 +780,7 @@ def test_gateway_client_does_not_follow_redirects() -> None:
 
     with GatewayClient(
         config(),
-        external_agent_id="demo-01",
+        external_agent_id="beta-01",
         gateway_agent_key=SYNTHETIC_GATEWAY_KEY,
         transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(GatewayProtocolError, match="redirect"):

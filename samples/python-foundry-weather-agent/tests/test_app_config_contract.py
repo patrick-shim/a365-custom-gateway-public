@@ -60,7 +60,7 @@ def test_gateway_agent_key_validator_accepts_only_the_exact_registration_format(
     ("value", "expected"),
     [
         ("abc", "abc"),
-        ("  Demo.Agent_01-Blue  ", "Demo.Agent_01-Blue"),
+        ("  Beta.Agent_01-Blue  ", "Beta.Agent_01-Blue"),
         ("A" + ("z" * 127), "A" + ("z" * 127)),
     ],
 )

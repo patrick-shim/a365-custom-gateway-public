@@ -148,7 +148,7 @@ reports an error.
 - Internet access from the sample process to the configured Foundry endpoint and
   `geocoding-api.open-meteo.com` / `api.open-meteo.com`.
 
-Open-Meteo does not require an API key for this demonstration. Follow its terms
+Open-Meteo does not require an API key for this beta sample. Follow its terms
 and usage limits; the sample applies bounded timeouts and does not use it as a
 Gateway dependency.
 
@@ -398,7 +398,7 @@ page.
 The sample Compose project contains only the MCP weather service. Its container
 has a health check and `unless-stopped` restart policy, so Docker restores it after
 an engine or host restart when Docker itself starts. The Flask app remains a
-loopback-only development process for local/private demonstration; the optional
+loopback-only development process for local/private beta use; the optional
 Windows task restores it at the owning user's logon and retries a failed process a
 bounded number of times. The Docker and Windows supervisors are independent. A
 manually stopped MCP container remains stopped, and the Flask task cannot run while

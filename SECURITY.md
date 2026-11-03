@@ -31,8 +31,8 @@ If a secret is exposed, revoke or rotate it through the owning service and revie
 its use. Removing a file from the latest revision does not remove earlier copies.
 
 The standalone Python weather sample deliberately saves its selected agent ID and
-Gateway key in browser `localStorage` for loopback demonstrations. Use its clear
-action after a demonstration. This exception does not apply to the Console or
+Gateway key in browser `localStorage` for loopback beta use. Use its clear
+action after a beta sample. This exception does not apply to the Console or
 remote deployments; see the [sample guide](samples/python-foundry-weather-agent/README.md).
 
 Required protection fails closed. Do not disable authentication, authorization,

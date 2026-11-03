@@ -127,7 +127,7 @@ def test_chat_requires_same_origin_json_and_returns_safe_contract() -> None:
         "history": [],
         "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
         "gatewayAgentKey": KEY,
-        "externalAgentId": "demo-01",
+        "externalAgentId": "beta-01",
     }
 
     rejected = client.post(
@@ -146,7 +146,7 @@ def test_chat_requires_same_origin_json_and_returns_safe_contract() -> None:
     assert accepted.json["outcome"] == "allowed"
     assert accepted.json["answer"] == "Safe answer"
     assert KEY not in accepted.get_data(as_text=True)
-    assert workflow.external_agent_ids == ["demo-01"]
+    assert workflow.external_agent_ids == ["beta-01"]
     assert workflow.gateway_keys == [KEY]
     assert workflow.evaluation_modes == [(True, True)]
 
@@ -169,7 +169,7 @@ def test_chat_dispatches_explicit_valid_evaluation_modes(
             "history": [],
             "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
             "gatewayAgentKey": KEY,
-            "externalAgentId": "demo-01",
+            "externalAgentId": "beta-01",
             "promptEvaluationEnabled": prompt_enabled,
             "responseEvaluationEnabled": response_enabled,
         },
@@ -207,7 +207,7 @@ def test_chat_requires_actual_json_booleans_for_evaluation_controls(
             "history": [],
             "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
             "gatewayAgentKey": KEY,
-            "externalAgentId": "demo-01",
+            "externalAgentId": "beta-01",
             field: value,
         },
         headers={"Origin": "http://localhost"},
@@ -233,7 +233,7 @@ def test_chat_rejects_response_on_prompt_off_before_workflow_dispatch() -> None:
             "history": [],
             "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
             "gatewayAgentKey": KEY,
-            "externalAgentId": "demo-01",
+            "externalAgentId": "beta-01",
             "promptEvaluationEnabled": False,
             "responseEvaluationEnabled": True,
         },
@@ -257,7 +257,7 @@ def test_chat_rejects_missing_or_invalid_key_before_workflow_dispatch() -> None:
         "message": "Weather in Seoul?",
         "history": [],
         "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
-        "externalAgentId": "demo-01",
+        "externalAgentId": "beta-01",
     }
 
     missing = client.post("/api/chat", json=base_body)
@@ -314,7 +314,7 @@ def test_agent_ids_and_keys_are_isolated_to_each_request_and_never_echoed() -> N
         "/api/chat",
         json={
             **base_body,
-            "externalAgentId": "  Demo.Agent-01  ",
+            "externalAgentId": "  Beta.Agent-01  ",
             "gatewayAgentKey": KEY,
         },
     )
@@ -322,7 +322,7 @@ def test_agent_ids_and_keys_are_isolated_to_each_request_and_never_echoed() -> N
         "/api/chat",
         json={
             **base_body,
-            "externalAgentId": "demo-agent-02",
+            "externalAgentId": "beta-agent-02",
             "gatewayAgentKey": second_key,
         },
     )
@@ -330,7 +330,7 @@ def test_agent_ids_and_keys_are_isolated_to_each_request_and_never_echoed() -> N
 
     assert first.status_code == 200
     assert second.status_code == 200
-    assert workflow.external_agent_ids == ["Demo.Agent-01", "demo-agent-02"]
+    assert workflow.external_agent_ids == ["Beta.Agent-01", "beta-agent-02"]
     assert workflow.gateway_keys == [KEY, second_key]
     assert KEY not in combined
     assert second_key not in combined
@@ -348,7 +348,7 @@ def test_every_route_rejects_a_non_loopback_host_before_workflow_dispatch() -> N
             "history": [],
             "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
             "gatewayAgentKey": KEY,
-            "externalAgentId": "demo-01",
+            "externalAgentId": "beta-01",
         },
         headers={
             "Host": "attacker.example",
@@ -375,7 +375,7 @@ def test_whole_turn_deadline_cancels_work_and_returns_unconfirmed_without_answer
             "history": [],
             "sessionId": "59b7d10b-0785-4b43-a532-6f0c7a253855",
             "gatewayAgentKey": KEY,
-            "externalAgentId": "demo-01",
+            "externalAgentId": "beta-01",
         },
         headers={"Origin": "http://localhost"},
     )

@@ -91,7 +91,7 @@ The complete requirements are in [SPEC.md](SPEC.md). In particular:
   explicit reconciliation. Never silently rotate credentials or adopt resources
   by name. Bootstrap has no implicit destroy path.
 
-The loopback Python demonstration has explicitly scoped comparison controls and
+The loopback Python beta sample has explicitly scoped comparison controls and
 browser credential persistence. Preserve their defaults, validation, disclosure,
 clear action, and unevaluated labels. Do not extend these exceptions to the
 Console or production deployments.

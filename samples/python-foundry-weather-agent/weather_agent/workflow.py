@@ -282,7 +282,7 @@ class AgentWorkflow:
             )
         model_input = canonical_model_input(message, history)
         canonical_prompt = model_input.protection_text
-        interaction_id = f"weather-demo-{uuid4()}"
+        interaction_id = f"weather-beta-{uuid4()}"
         stages: list[Stage] = []
 
         with self._gateway_factory(

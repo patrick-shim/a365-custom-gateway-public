@@ -11,7 +11,7 @@ reviewed assignment still follow the existing path after authoring.
 
 ## Console structure
 
-- Agents: registration and details; separate Prompt Shields, Data protection,
+- Agents: registration and details; guided Protection setup,
   Identity, API key, and Activity tabs.
 - Data protection: Policies, existing-policy discovery, individual-agent
   assignment, and enforcement evidence. No classifier or policy-rule editor.
@@ -194,3 +194,13 @@ operator validation rather than a documentation claim.
 * [Graph processContent](https://learn.microsoft.com/en-us/graph/api/userdatasecurityandgovernance-processcontent?view=graph-rest-1.0)
 * [Set-DlpCompliancePolicy Locations](https://learn.microsoft.com/en-us/powershell/module/exchangepowershell/set-dlpcompliancepolicy?view=exchange-ps#-locations)
 * [Purview API integration](https://learn.microsoft.com/en-us/purview/developer/use-the-api)
+
+## Beta verification flow
+
+The Console explicitly orchestrates reviewed assignment and prompt evaluation
+without adding a new runtime endpoint or relaxing fail-closed protection. It uses
+current assignment readback and checks normal allow, Prompt Shields block, and DLP
+block using operator-approved synthetic content. A policy-specific block is not
+inferred from arbitrary sample text or from another provider's rejection. Recorded
+allow/block observations remain separate from a currently running check. No manual
+catalog sync is required solely to turn historical evidence into a green badge.

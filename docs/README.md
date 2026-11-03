@@ -26,6 +26,6 @@ the [technical specification](../SPEC.md) for normative requirements, and
 | [Manual Purview refresh design and verification](spec/purview-connector-vnext.md) | Implemented local scope, evidence separation, administrator operations, migration, tests, and remaining live-validation boundary |
 | [Console design](console/design.md) | UI structure and behavior |
 | [Minimal Python echo sample](../samples/echo-agent.py) | One-file, standard-library prompt evaluation against an existing registration |
-| [Python Foundry/MCP weather agent sample](../samples/python-foundry-weather-agent/README.md) | Standalone Flask current-weather chat demo using the real Gateway, Foundry, MCP, and Open-Meteo flow |
+| [Python Foundry/MCP weather agent sample](../samples/python-foundry-weather-agent/README.md) | Standalone Flask current-weather chat beta using the real Gateway, Foundry, MCP, and Open-Meteo flow |
 | [Operations](../operations/README.md) | Runtime support and verification |
 | [Tests](../tests/README.md) | Source checks and explicit integration tests |

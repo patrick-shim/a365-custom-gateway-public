@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("runtime configuration", () => {
-  it("fails visibly rather than silently using demo data when settings are missing", async () => {
+  it("fails visibly rather than silently using synthetic data when settings are missing", async () => {
     vi.stubEnv("VITE_CLIENT_ID", "");
     vi.stubEnv("VITE_TENANT_ID", "");
     vi.stubEnv("VITE_API_SCOPE", "");

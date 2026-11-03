@@ -113,3 +113,16 @@ Review the manager application IDs against Microsoft's current
 and read back the corresponding first-party service principal in the intended
 tenant. Enter only the IDs reviewed for this deployment. Blueprint discovery alone
 does not establish that an application should receive manager authority.
+
+## Build identity
+
+Application image builds attach the Git source revision to OCI labels and the
+Console footer. A dirty working tree is labeled with a dirty suffix. For exact
+public/local parity, build from the clean published commit and retain the existing
+installation's Compose project, environment file and bootstrap directories.
+
+Successful main-branch validation publishes a short-lived `runtime-images` artifact
+containing the tested Gateway images and optional weather MCP image. Its revision
+labels identify the public commit; it contains no installation configuration.
+This supports installing the same tested images where local package feeds are
+unreachable. Runtime credentials and tenant configuration remain local.

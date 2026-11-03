@@ -45,7 +45,7 @@ service through Docker DNS with a bounded cache, so a replacement API container
 does not require a Console restart. Sign-in uses MSAL authorization code with
 PKCE, then a delegated bearer token for API calls.
 
-Missing configuration shows an error. There is no automatic mock/demo mode,
+Missing configuration shows an error. There is no automatic mock/beta mode,
 including when the old `CONSOLE_USE_MOCK` setting is true. Test fixtures are
 isolated to the regression suite.
 

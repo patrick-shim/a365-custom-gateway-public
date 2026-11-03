@@ -61,7 +61,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
     <div className={styles.root}>
       <div className={styles.card}>
         <div className={styles.mark} aria-hidden />
-        <Title2>A365 Gateway Console</Title2>
+        <Title2>A365 Gateway Console · Beta</Title2>
         <Body1>Sign in with your Microsoft Entra account to continue.</Body1>
         <Button
           appearance="primary"

@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.mcp
       args:
+        SOURCE_REVISION: ${SOURCE_REVISION:-unknown}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
     image: a365-weather-mcp:local

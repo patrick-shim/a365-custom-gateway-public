@@ -361,6 +361,12 @@ function Build-GatewayRuntimeImages {
     param([Parameter(Mandatory)]$Config)
 
     $root = Get-RepositoryRoot
+    $revision = (& git -C $root rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the source revision for image builds.' }
+    $changes = & git -C $root status --porcelain --untracked-files=normal
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot verify source cleanliness for image builds.' }
+    if ($changes) { $revision += '-dirty' }
+    $revisionArgument = "SOURCE_REVISION=$revision"
     $apiTag = "a365-gateway-api:$($Config.environment)"
     $workerTag = "a365-gateway-worker:$($Config.environment)"
     $consoleTag = "a365-gateway-console:$($Config.environment)"
@@ -369,17 +375,17 @@ function Build-GatewayRuntimeImages {
     try {
         Write-GatewayExperienceEvent -Type Info -Message "Building local API image $apiTag." -OutputFormat Text
         Invoke-BootstrapCommand -FilePath 'docker' -ArgumentList @(
-            'build', '-f', 'src/Gateway.Api/Dockerfile', '-t', $apiTag, '.'
+            'build', '--build-arg', $revisionArgument, '-f', 'src/Gateway.Api/Dockerfile', '-t', $apiTag, '.'
         ) | Out-Null
 
         Write-GatewayExperienceEvent -Type Info -Message "Building local Worker image $workerTag." -OutputFormat Text
         Invoke-BootstrapCommand -FilePath 'docker' -ArgumentList @(
-            'build', '-f', 'src/Gateway.Provisioning.Worker/Dockerfile', '-t', $workerTag, '.'
+            'build', '--build-arg', $revisionArgument, '-f', 'src/Gateway.Provisioning.Worker/Dockerfile', '-t', $workerTag, '.'
         ) | Out-Null
 
         Write-GatewayExperienceEvent -Type Info -Message "Building local React Console image $consoleTag." -OutputFormat Text
         Invoke-BootstrapCommand -FilePath 'docker' -ArgumentList @(
-            'build', '-f', 'web/console/Dockerfile', '-t', $consoleTag, 'web/console'
+            'build', '--build-arg', $revisionArgument, '-f', 'web/console/Dockerfile', '-t', $consoleTag, 'web/console'
         ) | Out-Null
     }
     finally {

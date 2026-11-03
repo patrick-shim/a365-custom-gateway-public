@@ -6,6 +6,8 @@ const toneByValue: Record<string, Tone> = {
   Healthy: "success",
   Succeeded: "success",
   Verified: "success",
+  EvidenceObserved: "informative",
+  VerificationRequired: "warning",
   Assigned: "success",
   Allowed: "success",
   Deleted: "success",

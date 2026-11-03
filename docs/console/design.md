@@ -16,7 +16,7 @@ authorization forwarding, API-reference routes, and health routes are preserved.
 - Settings / Purview: ongoing connection diagnostics; initial setup belongs to bootstrap.
 - API reference: opens the live interactive reference at `/docs` in a separate tab.
 
-Each agent separates Prompt Shields, Data protection, Identity, API key and Activity. The Console does not author classifiers, sensitive information types or policy rules. Registration confirmation requires delegated administrator access and is distinct from policy assignment.
+Each agent combines Prompt Shields and Data protection in Protection setup, alongside Identity, API key and Activity. Legacy protection tab links open that same setup. The Console does not author classifiers, sensitive information types or policy rules. Registration confirmation requires delegated administrator access and is distinct from policy assignment.
 
 ## Truthful interaction states
 
@@ -122,3 +122,20 @@ Short navigation and hover transitions respect reduced motion. Real pending acti
 React Setup is a separate frontend served by the local setup host. It collects the same settings as the terminal interface and invokes the same reviewed PowerShell plan/apply/verify flow. Its nonce/session isolation and request validation protect the local control surface. It does not duplicate provisioning logic in the browser.
 
 Run [Console and setup tests](../../tests/README.md) before deploying UI changes. Backend API contracts and permission checks remain authoritative.
+
+## Beta verification
+
+Apply and verify opens a reviewed flow for the exact agent and policy. Verify
+protection uses an existing assignment. The operator supplies a registration-bound
+key and approved synthetic DLP content; the test-user ID defaults to the signed-in
+user. The UI clears the key on submission/close and keeps it only for that run.
+It waits for current assignment evidence, sends normal, Prompt Shields, and DLP
+probes through the real prompt-evaluation API, and rechecks assignment/settings.
+Only the expected provider-specific decisions pass. Allowed DLP samples, unrelated
+blocks, unavailable providers and changed configuration stop with a relevant next
+action. Readiness is a time-bound observation, not a permanent guarantee. No GET
+or page load starts a verification run or Purview management read.
+Assignment polling is bounded; cancellation stops subsequent requests without
+rolling back accepted work. The screen explains that assignment continues after
+closing. Historical evidence never appears as an indefinitely running check.
+The Console displays Beta and the build's source revision in its shell.

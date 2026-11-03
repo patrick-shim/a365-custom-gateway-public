@@ -93,14 +93,14 @@ def test_foundry_tool_loop_calls_advertised_mcp_tool_and_returns_candidate() -> 
 
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(session),  # type: ignore[arg-type]
         completion_create=create,
     )
     result = asyncio.run(chat.generate(bound_input("What is the weather in Seoul?")))
 
     assert result.candidate_text == "Seoul is currently 18.2 °C."
-    assert result.model == "demo-model"
+    assert result.model == "beta-model"
     assert len(result.tool_events) == 1
     assert result.tool_events[0].name == "get_current_weather"
     assert session.calls == [("get_current_weather", {"location": "Seoul"})]
@@ -119,7 +119,7 @@ def test_foundry_rejects_unadvertised_tool_without_invoking_mcp() -> None:
 
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(session),  # type: ignore[arg-type]
         completion_create=lambda **_: completion(
             tool_calls=[tool_call("read_private_file", "{}")]
@@ -151,7 +151,7 @@ def test_foundry_stops_after_three_tool_rounds() -> None:
 
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(session),  # type: ignore[arg-type]
         completion_create=create,
         max_tool_rounds=3,
@@ -172,7 +172,7 @@ def test_foundry_limits_parallel_tool_calls_before_invoking_mcp() -> None:
     ]
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(session),  # type: ignore[arg-type]
         completion_create=lambda **_: completion(tool_calls=calls),
     )
@@ -312,7 +312,7 @@ def test_foundry_closes_credential_when_client_cleanup_fails(monkeypatch) -> Non
 
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(FakeMcpSession()),  # type: ignore[arg-type]
     )
 
@@ -331,7 +331,7 @@ def test_foundry_awaits_async_completion_create() -> None:
 
     chat = FoundryChat(
         azure_endpoint="https://sample.openai.azure.com/",
-        model_deployment="demo-model",
+        model_deployment="beta-model",
         mcp_client=FakeMcpClient(session),  # type: ignore[arg-type]
         completion_create=create,
     )
@@ -353,7 +353,7 @@ def test_foundry_rejects_non_public_azure_resource_endpoints(endpoint: str) -> N
     with pytest.raises(ValueError, match="Foundry endpoint"):
         FoundryChat(
             azure_endpoint=endpoint,
-            model_deployment="demo-model",
+            model_deployment="beta-model",
             mcp_client=FakeMcpClient(FakeMcpSession()),  # type: ignore[arg-type]
             completion_create=lambda **_: completion(content="unused"),
         )

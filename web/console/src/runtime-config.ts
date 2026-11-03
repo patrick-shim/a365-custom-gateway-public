@@ -1,5 +1,5 @@
 // The container supplies public Entra settings at startup. Missing settings must
-// never turn a live deployment into a demo.
+// never silently substitute synthetic data for a live deployment.
 
 export interface RuntimeConfig {
   clientId: string;

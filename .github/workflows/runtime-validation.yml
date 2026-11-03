@@ -130,6 +130,25 @@ jobs:
           "${dc[@]}" exec -T api bash -c 'set -eu; test "$(id -u)" != 0; test "$(cat /app/blueprint-credentials/.validation-write)" = synthetic; ! test -w /app/blueprint-credentials'
           "${dc[@]}" exec -T worker rm /app/blueprint-credentials/.validation-write
 
+      - name: Package verified public images
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          docker build --build-arg SOURCE_REVISION="$GITHUB_SHA" -f samples/python-foundry-weather-agent/Dockerfile.mcp -t a365-weather-mcp:local samples/python-foundry-weather-agent
+          for image in a365-gateway-api:dev a365-gateway-worker:dev a365-gateway-console:dev a365-weather-mcp:local; do
+            test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")" = "$GITHUB_SHA"
+          done
+          docker save a365-gateway-api:dev a365-gateway-worker:dev a365-gateway-console:dev a365-weather-mcp:local | gzip > "$RUNNER_TEMP/runtime-images.tar.gz"
+
+      - name: Publish verified image artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-images
+          path: ${{ runner.temp }}/runtime-images.tar.gz
+          retention-days: 2
+          compression-level: 0
+
       - name: Show container diagnostics on failure
         if: failure()
         shell: bash

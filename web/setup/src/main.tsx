@@ -125,7 +125,7 @@ function App() {
       <div className="layout">
         <aside>
           <div className="brand">
-            <span className="brand-icon">G</span>A365 Gateway
+            <span className="brand-icon">G</span>A365 Gateway · Beta
           </div>
           <div className="eyebrow">INSTALLATION</div>
           <h1>

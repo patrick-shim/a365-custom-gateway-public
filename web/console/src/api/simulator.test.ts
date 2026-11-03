@@ -60,3 +60,13 @@ it("does not echo unknown error codes or unsafe references",async()=>{
   expect(result.steps[0].detail).toContain("Access denied");
   expect(JSON.stringify(result)).not.toContain(input.apiKey);
 });
+
+it("rejects a receipt that does not match its evaluation before any further submission", async () => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ evaluationId: receipt, evaluationReceiptId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", interactionId: body.interactionId, allowed: true, decision: "PROMPT_ALLOWED", promptShieldProcessing: "Allowed", purviewProcessing: "Allowed", userMessage: "Allowed", correlationId: receipt }), { status: 200 });
+  });
+  const result = await simulateAgent(input, new AbortController().signal, () => {});
+  expect(result.outcome).toBe("Failed");
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

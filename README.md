@@ -1,5 +1,7 @@
 # A365 Custom Gateway
 
+**Release channel: Beta**
+
 **Author:** Patrick Shim · **License:** [MIT](LICENSE)
 
 See [Contributing](CONTRIBUTING.md) for development and review practices and
@@ -257,21 +259,33 @@ Compose profile.
 
 ## First use
 
-1. Sign in to the Console with a user assigned an appropriate Gateway role.
-2. Register an agent under an existing or new gateway-owned blueprint.
-3. Complete the displayed Agent 365 Registry confirmation when required.
-4. Copy the gateway API key, which is shown only once, into the external agent's
-   secret store.
-5. Configure Prompt Shields for the agent.
-6. Select an existing compatible Purview policy and confirm assignment to the
-   individual agent identity.
-7. Use **Test Agent** to send a normal and a synthetic-sensitive prompt through
-   the real gateway path.
-8. Verify gateway decisions, policy scope, Agent 365 activity, Purview visibility,
-   and Defender ingestion as separate pieces of evidence.
+1. Sign in with a user assigned an appropriate Gateway role.
+2. Register an agent and complete its Agent 365 Registry confirmation.
+3. Save its one-time Gateway API key securely.
+4. Open **Protection setup**, enable Prompt Shields, and select an existing
+   compatible Purview DLP policy.
+5. Review the exact agent/policy change and choose **Apply and verify**. Supply
+   the matching Gateway key, a test-user object ID, and an approved synthetic
+   sample that should match the selected policy. Confirm that only synthetic
+   test content is sent to the configured protection services.
+6. Follow the bounded assignment and protection checks on the same screen.
+   Expected Prompt Shields and DLP blocks count as successful verification.
+   **Ready for beta use** means this run observed the expected outcomes under
+   unchanged settings; it does not promise future availability or downstream
+   Microsoft visibility.
 
-Assignment confirmation is not proof that a policy has propagated or blocked a
-request. Test the selected agent and a same-blueprint sibling independently.
+For an already assigned policy, **Verify protection** runs the same checks without
+reapplying it. Verification stays in the open browser flow; closing it cancels
+remaining checks and clears entered credentials. Accepted assignments continue on
+the server. An unavailable or unknown result stops verification with recovery
+instructions; the Console never silently retries a content submission or assignment.
+Keys are used only in memory for the run. Normal checks issue unused receipts that
+expire; no language model, completed interaction, or success telemetry is fabricated.
+
+Assignment confirmation is not enforcement proof. Other applicable Purview policies
+may also cause a block, so the verification result does not attribute a block to one
+selected policy. Verify same-blueprint sibling scope and downstream destinations
+separately when validating a tenant deployment.
 
 External agent IDs are 3–128 characters, start with a letter or number, and may
 contain letters, numbers, dots, hyphens, and underscores. The Console validates
@@ -380,7 +394,7 @@ The script uses only the Python standard library and makes exactly one
 `POST /api/v1/prompts:evaluate` call. It prints the Gateway's allow or block result
 and stops. It does not register or provision an agent, call a model, submit
 activity, or submit a completed interaction. An allow receipt returned by this
-demonstration is intentionally unused and expires. Use the Console to create the
+beta sample is intentionally unused and expires. Use the Console to create the
 registration and save its key before running the script. The result demonstrates
 the pre-model Gateway boundary; it is not proof of visibility in Agent 365,
 Purview, or Defender. Set `GATEWAY_BASE_URL` only when the API is not at the local
@@ -400,7 +414,7 @@ Foundry or MCP runs; changing the ID clears the volatile conversation. Foundry
 uses the developer or managed identity through Azure Identity, with credentials
 kept in the server process.
 
-**Local demonstration exception:** the sample saves the selected ID and key in
+**Local beta exception:** the sample saves the selected ID and key in
 browser `localStorage`, restores them after reload, and offers a clear action.
 Flask keeps the key request-scoped and never stores or returns it. Remove browser
 credential persistence before remote or production hosting.

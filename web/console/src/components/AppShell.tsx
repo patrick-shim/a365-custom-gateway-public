@@ -24,7 +24,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav className="gateway-sidebar" aria-label="Primary">
         <div className="gateway-brand">
           <span className="gateway-mark" aria-hidden="true"><Flow24Regular /></span>
-          <div><strong>A365 Gateway</strong><span>CONTROL CENTER</span></div>
+          <div><strong>A365 Gateway · Beta</strong><span>CONTROL CENTER</span></div>
         </div>
         <button className="mobile-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="gateway-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <Dismiss24Regular /> : <Navigation24Regular />}</button>
         <div id="gateway-navigation" className={`gateway-navigation${menuOpen ? " is-open" : ""}`}>
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main id="main-content" tabIndex={-1} className="gateway-content">
           <div className="route-surface" key={location.pathname}>{children}</div>
         </main>
-        <footer className="workspace-footer"><span>A365 Gateway</span><span>One place to manage your agents.</span></footer>
+        <footer className="workspace-footer"><span>A365 Gateway · Beta · {import.meta.env.VITE_SOURCE_REVISION || "local build"}</span><span>One place to manage your agents.</span></footer>
       </div>
     </div>
   );

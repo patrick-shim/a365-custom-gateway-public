@@ -1,6 +1,8 @@
 # A365 Gateway Console — static SPA served by nginx, proxying /api to the Gateway API.
 FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /app
+ARG SOURCE_REVISION=unknown
+ENV VITE_SOURCE_REVISION=$SOURCE_REVISION
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

@@ -20,6 +20,31 @@ credential directory for the non-root worker before service startup, rejects
 linked directory paths, and preserves existing credential files and the API
 read-only mount.
 
+## Beta protection setup
+
+The Console provides one guided protection setup surface for Prompt Shields,
+existing-policy review, assignment and explicit verification. Apply and verify
+retains the reviewed exact-target confirmation contract. Verification uses the
+registered agent credential in memory, the selected test-user context, a normal
+prompt, a synthetic Prompt Shields probe and an operator-approved policy-matching
+synthetic DLP sample. It calls the existing prompt-evaluation API only; expected
+provider-specific blocks count as success and no model/interaction is fabricated.
+The UI validates structured verdicts, matching receipts, current assignment and
+unchanged agent settings before reporting Ready for beta use. Verification must
+never mark disabled, skipped, unavailable, wrong-provider or malformed results as
+success. Only transient assignment status is polled with a bounded deadline;
+content submissions and uncertain mutations are never automatically retried.
+Closing/unmounting cancels browser verification, releases keys and cannot undo an
+accepted durable assignment. Reopening requires an explicit fresh run. Historical
+allow/block observations are displayed as evidence, not an active validation job.
+New verification does not require management availability for an already confirmed
+assignment. New assignments retain connector readiness checks and reviewed writes.
+Public UI/source documentation consistently uses Beta as the release channel.
+Gateway application images carry their source revision; the Console displays it.
+A clean revision is claimed only for a clean checkout; local modifications are
+marked dirty. Runtime deployment preserves existing configuration, volumes and
+owned Microsoft resources.
+
 ## 1. Purpose
 
 A365 Custom Gateway is an identity, protection, observability, and administration
@@ -89,7 +114,7 @@ generated OpenAPI document remains authoritative for machine-readable schemas.
   Azure AI Foundry chat deployment and a separately supervised MCP weather
   container while exercising the existing Gateway ingress contracts with a
   registered agent. Its optional Windows logon supervisor restores only the
-  loopback Flask demo process and never joins Gateway bootstrap or runtime.
+  loopback Flask beta process and never joins Gateway bootstrap or runtime.
 
 ### 3.2 Excluded
 
@@ -665,7 +690,7 @@ visibility.
 
 ### 12.2 Standalone Python live-agent sample
 
-The repository includes an optional external-agent demonstration under
+The repository includes an optional external-agent beta sample under
 `samples/python-foundry-weather-agent/`. It is outside the Gateway runtime and
 Gateway Docker Compose topology. For every test run, the operator enters an exact valid
 external agent ID and its matching Gateway key in the Flask UI. There is no default,
@@ -1103,7 +1128,7 @@ A release is complete only when the applicable checks demonstrate:
 ├── operations/                     Operational boundaries and runbooks
 ├── samples/
 │   ├── echo-agent.py               Minimal prompt-evaluation example
-│   └── python-foundry-weather-agent/ Standalone live external-agent demo
+│   └── python-foundry-weather-agent/ Standalone live external-agent beta sample
 ├── src/
 │   ├── ExternalAgent.Sample/       Model-stub integration sample
 │   ├── Gateway.Api/                HTTP host and OpenAPI
