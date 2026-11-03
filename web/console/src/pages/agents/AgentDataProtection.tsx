@@ -16,6 +16,7 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { api } from "../../api/client";
+import { refreshAssignmentCatalog } from "../../api/assignmentReview";
 import { ApiError } from "../../api/errors";
 import type { AgentDetail, PurviewConnection } from "../../api/types";
 import { ErrorState } from "../../components/ErrorState";
@@ -57,6 +58,18 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
   );
   const [action, setAction] = useState<"review" | "confirm" | null>(null);
   const [error, setError] = useState<unknown>();
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const reviewAbort = useRef<AbortController | null>(null);
+  useEffect(() => {
+    setAction(null);
+    setReview(null);
+    setSelected("");
+    setRefreshFailed(false);
+    return () => {
+      reviewAbort.current?.abort();
+      reviewAbort.current = null;
+    };
+  }, [agent.agentId]);
   const [errorPhase, setErrorPhase] = useState<"review" | "confirm">("review");
   const busy = action !== null;
   const policy = catalog.data?.items.find((x) => x.id === selected);
@@ -86,7 +99,7 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
     if (!current) return;
     const previous = previousLoadedCatalog.current;
     previousLoadedCatalog.current = current;
-    if (previous === undefined || previous === current) return;
+    if (previous === undefined || previous === current || reviewAbort.current) return;
     setSelected("");
     setReview(null);
     if (error instanceof ApiError && error.code === "PURVIEW_INVENTORY_STALE") {
@@ -98,17 +111,39 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
     catalog.data?.retrievedAtUtc,
     now,
   );
-  async function prepare() {
-    if (!policy || !reviewReadiness.ready) return;
+  async function prepare(saved = false) {
+    if (!policy || !reviewReadiness.ready || reviewAbort.current) return;
+    const controller = new AbortController();
+    reviewAbort.current = controller;
     setAction("review");
+    setReview(null);
     setError(undefined);
+    setRefreshFailed(false);
     setErrorPhase("review");
+    let refreshed = saved;
     try {
-      setReview(await api.reviewAgentPolicy(agent.agentId, policy.id, policy.revision));
+      const latest = saved ? catalog.data! : await refreshAssignmentCatalog(controller.signal);
+      if (controller.signal.aborted) return;
+      refreshed = true;
+      // Preserve the exact selection across the refresh; never substitute another policy.
+      previousLoadedCatalog.current = latest.retrievedAtUtc;
+      cache.setQueryData(purviewPolicyCatalogQueryKey, latest);
+      const current = latest.items.find((item) => item.id === policy.id);
+      if (!current?.compatibility.canAssign)
+        throw new ApiError("The selected policy was removed or is no longer compatible. Select another policy.", 409);
+      const prepared = await api.reviewAgentPolicy(agent.agentId, current.id, current.revision);
+      if (!controller.signal.aborted) setReview(prepared);
     } catch (e) {
-      setError(e);
+      if (!controller.signal.aborted) {
+        setError(e);
+        setRefreshFailed(!refreshed);
+      }
     } finally {
-      setAction(null);
+      if (reviewAbort.current === controller) reviewAbort.current = null;
+      if (!controller.signal.aborted) {
+        setAction(null);
+        void cache.invalidateQueries({ queryKey: purviewConnectionQueryKey });
+      }
     }
   }
   async function confirm() {
@@ -154,7 +189,7 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
         {catalog.data && (
           <Caption1>
             Last synced {new Date(catalog.data.retrievedAtUtc).toLocaleString()}. Saved policies
-            stay available until the next successful manual sync.
+            stay available until the next successful sync. Review assignment refreshes them before approval.
           </Caption1>
         )}
         {catalog.isPending && <Spinner size="small" label="Loading saved policies" />}
@@ -218,10 +253,18 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
             !policy || busy || pending || !!review || catalog.isError || !reviewReadiness.ready
           }
           icon={action === "review" ? <Spinner size="tiny" /> : undefined}
-          onClick={() => void prepare()}
+          onClick={() => void prepare(false)}
         >
-          {action === "review" ? "Preparing review…" : "Review assignment"}
+          {action === "review" ? "Refreshing policy for review…" : "Review assignment"}
         </Button>
+        {refreshFailed && !review && (
+          <>
+            <Body1>The saved policy may have changed. A saved-policy review still requires a matching live revision before Purview can apply it.</Body1>
+            <Button disabled={busy || !policy || pending} onClick={() => void prepare(true)}>
+              Review saved policy
+            </Button>
+          </>
+        )}
         <Button
           disabled={busy || catalog.isFetching || connection.isFetching || !!review}
           icon={catalog.isFetching || connection.isFetching ? <Spinner size="tiny" /> : undefined}

@@ -52,6 +52,17 @@ Policy assignment distinguishes applying, assigned, needs-attention, failure and
 
 API keys are visible once and are not retained in query caches. Role-aware controls supplement server authorization. Search cursors and operation identifiers come from the server. Failed or uncertain mutations must not display fabricated success.
 
+## Assignment review freshness
+
+Review assignment requests a catalog refresh, shows bounded progress, and prepares
+the exact selected policy from the authenticated accepted result. It reuses an
+already active connector read instead of submitting overlapping refreshes. No
+assignment is confirmed automatically. If refresh fails or polling times out, the
+Console stops progress and offers Review saved policy with an explicit warning;
+provider-side revision checks still reject stale writes. Successful refresh clears
+obsolete reviews without clearing the selected policy while its new review is being
+prepared. Navigating away stops local polling and cannot trigger a later review.
+
 ## Purview connection and Manual sync
 
 The Settings / Purview page reads the local connection record and exposes

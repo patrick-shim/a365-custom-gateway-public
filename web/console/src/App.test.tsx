@@ -27,6 +27,17 @@ vi.mock("./runtime-config", () => ({ config: { tenantId: "11111111-1111-4111-811
 let server: ReturnType<typeof mockServer>;
 beforeEach(() => { server = mockServer(); });
 
+function mockAssignmentRefresh() {
+  server.handlers.set("POST /api/v1/protection/purview/connection/refresh", () => response({
+    operationId, status: "Pending", connectionState: "Refreshing", expiresAtUtc: "2099-01-01T00:00:00Z",
+  }, 202));
+  server.handlers.set(`GET /api/v1/operations/${operationId}`, () => ({
+    ...registrationOperation, agentId: null, type: "RefreshCatalog", status: "Succeeded",
+    startedAtUtc: "2000-01-01T00:00:00Z", completedAtUtc: new Date().toISOString(),
+    targetKind: "PurviewConnector", targetId: purviewConnection.connectorInstanceId,
+  }));
+}
+
 function renderApp(path = "/") {
   const client = new QueryClient({ defaultOptions: {
     queries: { retry: false, gcTime: 0, refetchOnWindowFocus: false }, mutations: { retry: false, gcTime: 0 },
@@ -741,8 +752,13 @@ describe("Console routes with actual API envelopes", () => {
   });
 
   it("reviews the exact agent and policy before confirming, and does not label a pending assignment protected", async () => {
+    mockAssignmentRefresh();
     const policyId = "99999999-9999-4999-8999-999999999999";
-    const revision = "a".repeat(64);
+    let revision = "a".repeat(64);
+    server.handlers.set("POST /api/v1/protection/purview/connection/refresh", () => {
+      revision = "b".repeat(64);
+      return response({ operationId, status: "Pending", connectionState: "Refreshing", expiresAtUtc: "2099-01-01T00:00:00Z" }, 202);
+    });
     server.handlers.set("GET /api/v1/protection/purview/policies", () => ({ tenantId, source: "AcceptedPurviewConnectorSnapshot", retrievedAtUtc: new Date().toISOString(), items: [
       { id: policyId, displayName: "Existing DLP", mode: "Enable", enforcementPlanes: ["Application"], individualApplicationIds: [], revision, compatibility: { canAssign: true, reason: null } },
     ] }));
@@ -759,7 +775,7 @@ describe("Console routes with actual API envelopes", () => {
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(0);
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByText(`Agent identity: ${agent.agent365.agentId}`)).toBeVisible();
-    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(1);
+    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Assign policy" }));
     expect(await screen.findByText("Applying assignment")).toBeVisible();
     expect(screen.getByRole("progressbar", { name: "Applying assignment" })).toBeVisible();
@@ -767,8 +783,8 @@ describe("Console routes with actual API envelopes", () => {
     expect(screen.getByText(/Last checked/)).toBeVisible();
     expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review assignment" })).toBeDisabled();
-    expect(server.requests.find(x => x.path.endsWith("/purview-policies/review"))?.body).toEqual({ policyId, revision });
-    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
+    expect(server.requests.find(x => x.path.endsWith("/purview-policies/review"))?.body).toEqual({ policyId, revision: "b".repeat(64) });
+    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(3);
     server.handlers.set(`GET /api/v1/agents/${agentId}/purview-policies`, () => ({ agentId, agentIdentityId: agent.agent365.agentId, bindingCurrent: true, allowObservedAtUtc: null, blockObservedAtUtc: null,
       items: [{ operationId, policyId, policyName: "Existing DLP", status: "Assigned", failureCode: null, assignedAtUtc: new Date().toISOString() }] }));
     await user.click(screen.getByRole("button", { name: "Check assignment status" }));
@@ -776,7 +792,35 @@ describe("Console routes with actual API envelopes", () => {
     expect(screen.queryByRole("progressbar", { name: "Applying assignment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run protection checks" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Registered API key")).not.toBeInTheDocument();
-    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
+    expect(server.requests.filter(x => x.method === "POST")).toHaveLength(3);
+  });
+
+  it("requires an explicit saved-policy review after refresh failure and never confirms automatically", async () => {
+    const policyId = "99999999-9999-4999-8999-999999999999";
+    const revision = "a".repeat(64);
+    server.handlers.set("GET /api/v1/protection/purview/policies", () => ({
+      tenantId, source: "AcceptedPurviewConnectorSnapshot", retrievedAtUtc: "2026-10-22T09:59:00Z",
+      items: [{ id: policyId, displayName: "Saved DLP", mode: "Enable", enforcementPlanes: ["Application"],
+        individualApplicationIds: [], revision, compatibility: { canAssign: true, reason: null } }],
+    }));
+    server.handlers.set("POST /api/v1/protection/purview/connection/refresh", () => response({
+      title: "Connector unavailable", detail: "Connector unavailable", errorCode: "PURVIEW_CONNECTOR_UNAVAILABLE",
+    }, 503));
+    server.handlers.set(`POST /api/v1/agents/${agentId}/purview-policies/review`, () => ({
+      operationId, agentId, agentIdentityId: agent.agent365.agentId, policyId, policyName: "Saved DLP",
+      expiresAtUtc: new Date(Date.now() + 60000).toISOString(), effect: "Only this individual agent is added.",
+    }));
+    renderApp(`/agents/${agentId}?tab=data-protection`);
+    const user = userEvent.setup();
+    await screen.findByRole("option", { name: "Saved DLP" });
+    await user.selectOptions(screen.getByLabelText("Choose an existing policy"), policyId);
+    await user.click(screen.getByRole("button", { name: "Review assignment" }));
+    await screen.findByRole("button", { name: "Review saved policy" });
+    expect(server.requests.some(x => x.path.endsWith("/purview-policies/review"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Review saved policy" }));
+    expect(await screen.findByRole("button", { name: "Assign policy" })).toBeEnabled();
+    expect(server.requests.find(x => x.path.endsWith("/purview-policies/review"))?.body).toEqual({ policyId, revision });
+    expect(server.requests.some(x => x.path.endsWith("/confirm"))).toBe(false);
   });
 
   it.each(["Refreshing", "Degraded", "Disconnected"])("keeps cached policy selection usable while management is %s", async state => {
@@ -834,7 +878,8 @@ describe("Console routes with actual API envelopes", () => {
     expect(server.requests.every(request => request.method === "GET")).toBe(true);
   });
 
-  it("reviews a year-old accepted catalog without requesting a sync", async () => {
+  it("refreshes an old saved policy before preparing its review", async () => {
+    mockAssignmentRefresh();
     const policyId = "99999999-9999-4999-8999-999999999999";
     const retrievedAtUtc = new Date(Date.now() - 365 * 24 * 60 * 60_000).toISOString();
     server.handlers.set("GET /api/v1/protection/purview/connection", () => ({
@@ -862,12 +907,13 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByRole("button", { name: "Assign policy" })).toBeEnabled();
     const mutations = server.requests.filter(request => request.method === "POST");
-    expect(mutations).toHaveLength(1);
-    expect(mutations[0].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
-    expect(mutations[0].body).toEqual({ policyId, revision: "a".repeat(64) });
+    expect(mutations).toHaveLength(2);
+    expect(mutations[1].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
+    expect(mutations[1].body).toEqual({ policyId, revision: "a".repeat(64) });
   });
 
   it("clears an obsolete stale-catalog warning after a newer verified catalog is loaded", async () => {
+    mockAssignmentRefresh();
     const policyId = "99999999-9999-4999-8999-999999999999";
     let retrievedAtUtc = new Date(Date.now() - 60_000).toISOString();
     server.handlers.set("GET /api/v1/protection/purview/connection", () => ({
@@ -901,7 +947,7 @@ describe("Console routes with actual API envelopes", () => {
     await waitFor(() => expect(screen.queryByText("Assignment review could not be prepared")).not.toBeInTheDocument());
     expect(screen.getByLabelText("Choose an existing policy")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Review assignment" })).toBeDisabled();
-    expect(server.requests.filter(request => request.method === "POST")).toHaveLength(1);
+    expect(server.requests.filter(request => request.method === "POST")).toHaveLength(2);
   });
 
   it("stops animating an overdue assignment without inventing success or submitting again", async () => {

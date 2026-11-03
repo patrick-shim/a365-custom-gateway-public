@@ -34,6 +34,13 @@ protection-revision, expiry and concurrency checks. The connector reads the poli
 live, preserves unrelated scope and rules, and confirms the exact target by
 readback before the Console reports Assigned.
 
+Preparing a review requests an explicit catalog refresh and waits for successful
+authenticated acceptance before using the selected policy's new revision. Page loads
+and status polling never initiate refreshes. Refresh failure does not silently reuse
+the old revision: the Console offers an explicitly labeled saved-policy review,
+retaining cached review availability while preserving live write concurrency checks.
+Leaving the page cancels local polling, not an accepted connector operation.
+
 Assignment setup does not request an agent key, test-user ID or synthetic content.
 It has no protection-verification drawer, test-evidence warning, or mandatory
 allow/block probes. Applying, Assigned, NeedsAttention and failed/unknown outcomes

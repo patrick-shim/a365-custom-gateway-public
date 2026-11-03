@@ -116,7 +116,7 @@ function failure(status: number, value: unknown): never {
     AGENT_DISABLED:
       "This agent is disabled in the gateway. Enable it in Manage Agents before testing.",
     PURVIEW_ASSIGNMENT_NOT_READY:
-      "Purview protection is not ready. Open Data protection and wait for the selected policy assignment to finish. If it has finished, check Purview connection diagnostics before retrying.",
+      "Purview policy assignment is not ready. Open Protection setup and check its status. Wait only while Applying; if it failed or needs attention, select the policy and choose Review assignment to refresh its current state before assigning again.",
     PURVIEW_INVENTORY_STALE:
       "The synchronized Purview policy catalog is stale. Check Purview connection diagnostics and wait for a successful refresh before retrying.",
     PURVIEW_TENANT_NOT_CONNECTED:

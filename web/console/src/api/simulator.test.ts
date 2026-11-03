@@ -41,7 +41,7 @@ it("reports lost interaction responses as unconfirmed and never replays them",as
   expect(result.outcome).toBe("Partial");expect(result.steps.at(-1)?.status).toBe("Unconfirmed");expect(fetch).toHaveBeenCalledTimes(3);
 });
 it.each([
-  [409,"PURVIEW_ASSIGNMENT_NOT_READY","Purview protection is not ready"],
+  [409,"PURVIEW_ASSIGNMENT_NOT_READY","Purview policy assignment is not ready"],
   [409,"PURVIEW_INVENTORY_STALE","policy catalog is stale"],
   [403,"PROMPT_EVALUATION_INVALID","current policy scope could not be verified"],
   [403,"AGENT_IDENTITY_MISMATCH","different agent"],

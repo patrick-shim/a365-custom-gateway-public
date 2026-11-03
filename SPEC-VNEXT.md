@@ -33,6 +33,12 @@ The local implementation has offline regression coverage. Passing those checks
 does not establish live tenant enforcement, Windows restart recovery, Docker
 restart recovery, or downstream Microsoft-service visibility.
 
+Assignment review refreshes the catalog as part of the explicit Review assignment
+action. Regression coverage must prove that a second agent uses the revision after
+the first assignment, that refresh failures cannot silently submit an old revision,
+and that saved-policy review remains explicitly available during outages. This is
+a correction to the current local workflow, not a deferred server/cloud milestone.
+
 ## Current release boundaries
 
 - Bootstrap publishes an initial verified catalog. Subsequent provider reads

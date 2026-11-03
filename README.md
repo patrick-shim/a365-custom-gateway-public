@@ -31,6 +31,12 @@ data.
 > development-gated preview. Production hosting requires deployment-specific TLS,
 > durable secret management, infrastructure hardening, and service supervision.
 
+Before preparing an assignment review, the Console requests a Purview catalog refresh
+and waits for its authenticated result. The review uses the refreshed policy revision,
+so adding another agent does not reuse the revision from before the previous assignment.
+Cached policies remain selectable during outages; an explicit saved-policy review is
+available after a refresh failure, with live revision checks still required before writing.
+
 ## Why this project exists
 
 An external agent can run anywhere, but Microsoft governance features need a
