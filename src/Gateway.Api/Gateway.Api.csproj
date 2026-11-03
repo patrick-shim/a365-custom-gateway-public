@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.4.1" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.14.2" />
+    <!-- Override older transitive versions until the identity package includes these security fixes. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gateway.Contracts\Gateway.Contracts.csproj" />
+    <ProjectReference Include="..\Gateway.Application\Gateway.Application.csproj" />
+    <ProjectReference Include="..\Gateway.Infrastructure\Gateway.Infrastructure.csproj" />
+    <ProjectReference Include="..\Gateway.Agent365\Gateway.Agent365.csproj" />
+    <ProjectReference Include="..\Gateway.Purview\Gateway.Purview.csproj" />
+    <ProjectReference Include="..\Gateway.ContentSafety\Gateway.ContentSafety.csproj" />
+    <ProjectReference Include="..\Gateway.Observability\Gateway.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gateway.RuntimeDataPlane.Tests" />
+    <InternalsVisibleTo Include="Gateway.Purview.Consumption.Tests" />
+  </ItemGroup>
+</Project>

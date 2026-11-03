@@ -1,0 +1,922 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$script:GraphAppId = '00000003-0000-0000-c000-000000000000'
+$script:PurviewExchangeOnlineAppId = '00000002-0000-0ff1-ce00-000000000000'
+$script:PurviewExchangeManageAsAppRoleId = 'dc50a0fb-09a3-484d-be87-e023b12c6440'
+
+function Get-ExactApplicationByDisplayName {
+    param([Parameter(Mandatory)][string]$DisplayName)
+    $escaped = $DisplayName.Replace("'", "''")
+    $filter = [Uri]::EscapeDataString("displayName eq '$escaped'")
+    $applications = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/applications?`$filter=$filter&`$select=id,appId,displayName,signInAudience,identifierUris,tags,api,appRoles,requiredResourceAccess,passwordCredentials,keyCredentials,web,spa,publicClient,isFallbackPublicClient")
+    if ($applications.Count -gt 1) { throw "More than one application is named '$DisplayName'; refusing ambiguous adoption." }
+    if ($applications.Count -eq 1) { return $applications[0] }
+    return $null
+}
+
+function Get-ServicePrincipalByAppId {
+    param([Parameter(Mandatory)][string]$AppId)
+    $filter = [Uri]::EscapeDataString("appId eq '$AppId'")
+    $principals = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals?`$filter=$filter&`$select=id,appId,displayName,appRoles,oauth2PermissionScopes,passwordCredentials,keyCredentials,accountEnabled,appRoleAssignmentRequired,servicePrincipalType,servicePrincipalNames,tags,alternativeNames")
+    if ($principals.Count -gt 1) { throw "Multiple service principals exist for application ID $AppId." }
+    if ($principals.Count -eq 1) { return $principals[0] }
+    return $null
+}
+
+function Get-ApplicationsByExactIdentifierUri {
+    param([Parameter(Mandatory)][string]$IdentifierUri)
+
+    if ([string]::IsNullOrWhiteSpace($IdentifierUri) -or $IdentifierUri.Length -gt 512) {
+        throw 'Application identifier URI must be one bounded nonempty value.'
+    }
+    $escaped = $IdentifierUri.Replace("'", "''")
+    $filter = [Uri]::EscapeDataString("identifierUris/any(uri:uri eq '$escaped')")
+    $applications = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/applications?`$filter=$filter&`$select=id,identifierUris")
+    foreach ($application in $applications) {
+        $identifierUris = $null
+        if ($application -is [System.Collections.IDictionary]) {
+            if ($application.Contains('identifierUris')) { $identifierUris = $application['identifierUris'] }
+        }
+        else {
+            $property = $application.PSObject.Properties['identifierUris']
+            if ($null -ne $property) { $identifierUris = $property.Value }
+        }
+        if ($null -eq $identifierUris -or $identifierUris -is [string] -or
+            $identifierUris -isnot [System.Collections.IEnumerable] -or
+            -not (@($identifierUris) -ccontains $IdentifierUri)) {
+            throw 'Microsoft Graph identifier-URI collision discovery returned an object outside the exact requested boundary.'
+        }
+    }
+    return $applications
+}
+
+function Assert-GatewayApplicationNamespacePlanBoundary {
+    param(
+        [Parameter(Mandatory)]$Config,
+        [Parameter(Mandatory)][string]$DeploymentOwnershipId
+    )
+
+    # Limited read-only Plan preflight, not adoption or application readiness.
+    # Apply/Up must still independently verify full shape, owners, principals
+    # and grants; this check neither reserves the namespace nor repairs anything.
+    try {
+        $expectedTags = @(Get-BootstrapApplicationTags -DeploymentOwnershipId $DeploymentOwnershipId)
+        if ($Config.purview.enabled -isnot [bool]) { throw 'Unknown optional capability selection.' }
+        $suffix = "$($Config.projectName)-$($Config.environment)"
+        $apiName = "A365 Gateway API - $suffix"
+        $names = @($apiName, "A365 Gateway Console - $suffix", "A365 Gateway Workload - $suffix")
+        if ($Config.purview.enabled) { $names += "A365 Gateway Purview Policies - $suffix" }
+        $apiObjectId = ''
+        foreach ($name in $names) {
+            $application = Get-ExactApplicationByDisplayName -DisplayName $name
+            if ($null -eq $application) { continue }
+            Assert-GuidValue -Value ([string]$application.id) -Label 'Application object ID'
+            $tagsProperty = $application.PSObject.Properties['tags']
+            if ([string]$application.displayName -cne $name -or
+                $null -eq $tagsProperty -or $tagsProperty.Value -isnot [System.Array] -or
+                @($tagsProperty.Value | Where-Object { $_ -isnot [string] }).Count -ne 0 -or
+                -not (Test-ExactStringSet -Actual @($tagsProperty.Value) -Expected $expectedTags)) {
+                throw 'Application discovery did not prove the exact owned namespace.'
+            }
+            if ($name -ceq $apiName) { $apiObjectId = [string]$application.id }
+        }
+
+        # Query even when the API name exists: a differently named URI owner or
+        # ambiguous result must never pass on the strength of display-name tags.
+        $audience = "api://a365-gateway-$suffix"
+        $matches = @(Get-ApplicationsByExactIdentifierUri -IdentifierUri $audience)
+        if ($matches.Count -gt 1) { throw 'Ambiguous application identifier URI.' }
+        if ($matches.Count -eq 1) {
+            Assert-GuidValue -Value ([string]$matches[0].id) -Label 'Identifier URI owner object ID'
+            if ([string]::IsNullOrWhiteSpace($apiObjectId) -or
+                -not $apiObjectId.Equals([string]$matches[0].id, [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Application identifier URI is not bound to the owned API name.'
+            }
+        }
+        return $true
+    }
+    catch {
+        # Never surface discovery exceptions or provider prose through Plan.
+        throw 'Entra application namespace could not be verified. Choose a unique, fresh project name for a new deployment. Preserve existing objects; do not adopt, repair, or delete them. Confirm Graph read access, then run Plan again.'
+    }
+}
+
+function Invoke-GraphJsonBody {
+    param([Parameter(Mandatory)][string]$Method, [Parameter(Mandatory)][string]$Url, [Parameter(Mandatory)]$Body)
+    $json = $Body | ConvertTo-Json -Depth 30 -Compress
+    return Invoke-AzJson -Arguments @('rest', '--method', $Method, '--url', $Url, '--headers', 'Content-Type=application/json', '--body', $json)
+}
+
+function Get-BoundedGraphCollection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$InitialUrl,
+        [ValidateRange(1, 100)][int]$MaximumPages = 20,
+        [ValidateRange(1, 50000)][int]$MaximumItems = 10000
+    )
+
+    $initialUri = $null
+    if (-not [Uri]::TryCreate($InitialUrl, [UriKind]::Absolute, [ref]$initialUri) -or
+        $initialUri.Scheme -cne 'https' -or
+        -not $initialUri.DnsSafeHost.Equals('graph.microsoft.com', [StringComparison]::OrdinalIgnoreCase) -or
+        (-not $initialUri.IsDefaultPort -and $initialUri.Port -ne 443) -or
+        -not [string]::IsNullOrEmpty($initialUri.UserInfo) -or
+        -not [string]::IsNullOrEmpty($initialUri.Fragment) -or
+        -not $initialUri.AbsolutePath.StartsWith('/v1.0/', [StringComparison]::Ordinal)) {
+        throw 'Microsoft Graph collection URL must use the exact public-cloud HTTPS v1.0 origin.'
+    }
+
+    $collectionPath = $initialUri.AbsolutePath
+    $nextUrl = $InitialUrl
+    $visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $items = [Collections.Generic.List[object]]::new()
+
+    for ($page = 1; $page -le $MaximumPages; $page++) {
+        $pageUri = $null
+        if (-not [Uri]::TryCreate($nextUrl, [UriKind]::Absolute, [ref]$pageUri) -or
+            $pageUri.Scheme -cne 'https' -or
+            -not $pageUri.DnsSafeHost.Equals('graph.microsoft.com', [StringComparison]::OrdinalIgnoreCase) -or
+            (-not $pageUri.IsDefaultPort -and $pageUri.Port -ne 443) -or
+            -not [string]::IsNullOrEmpty($pageUri.UserInfo) -or
+            -not [string]::IsNullOrEmpty($pageUri.Fragment) -or
+            $pageUri.AbsolutePath -cne $collectionPath) {
+            throw 'Microsoft Graph continuation left the exact HTTPS collection origin or path.'
+        }
+        if (-not $visited.Add($pageUri.AbsoluteUri)) {
+            throw 'Microsoft Graph collection returned a repeated continuation URL.'
+        }
+
+        # Microsoft documents the continuation as opaque. Validate its trust
+        # boundary above, then send the complete value without reconstructing it.
+        $response = Invoke-AzJson -Arguments @('rest', '--method', 'GET', '--url', $nextUrl)
+        if ($null -eq $response -or $null -eq $response.PSObject.Properties['value'] -or
+            $response.value -isnot [System.Array]) {
+            throw 'Microsoft Graph collection response did not contain the required value array.'
+        }
+        foreach ($item in @($response.value)) {
+            if ($null -eq $item) { throw 'Microsoft Graph collection returned a null item.' }
+            if ($items.Count -ge $MaximumItems) {
+                throw "Microsoft Graph collection exceeded the bounded item limit of $MaximumItems."
+            }
+            $items.Add($item)
+        }
+
+        $nextProperty = $response.PSObject.Properties['@odata.nextLink']
+        if ($null -eq $nextProperty -or $null -eq $nextProperty.Value -or
+            [string]::IsNullOrWhiteSpace([string]$nextProperty.Value)) {
+            return @($items)
+        }
+        $nextUrl = [string]$nextProperty.Value
+    }
+
+    throw "Microsoft Graph collection exceeded the bounded page limit of $MaximumPages."
+}
+
+function Get-OptionalObjectPropertyValue {
+    param(
+        [Parameter()][AllowNull()]$InputObject,
+        [Parameter(Mandatory)][string]$PropertyName
+    )
+    if ($null -eq $InputObject) { return $null }
+    if ($InputObject -is [Collections.IDictionary]) {
+        if (-not $InputObject.Contains($PropertyName)) { return $null }
+        return $InputObject[$PropertyName]
+    }
+    $property = $InputObject.PSObject.Properties[$PropertyName]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
+function Test-OptionalFalseBooleanProperty {
+    param(
+        [Parameter()][AllowNull()]$InputObject,
+        [Parameter(Mandatory)][string]$PropertyName
+    )
+    $value = Get-OptionalObjectPropertyValue -InputObject $InputObject -PropertyName $PropertyName
+    if ($null -eq $value) { return $true }
+    return $value -is [bool] -and $value -eq $false
+}
+
+function Assert-ExactApplicationAuthenticationSurface {
+    param(
+        [Parameter(Mandatory)]$Application,
+        [Parameter(Mandatory)][string]$ApplicationLabel
+    )
+
+    $api = Get-OptionalObjectPropertyValue -InputObject $Application -PropertyName 'api'
+    $web = Get-OptionalObjectPropertyValue -InputObject $Application -PropertyName 'web'
+    $implicit = Get-OptionalObjectPropertyValue -InputObject $web -PropertyName 'implicitGrantSettings'
+    foreach ($boundary in @(
+        [ordered]@{ object = $Application; property = 'isFallbackPublicClient' },
+        [ordered]@{ object = $api; property = 'acceptMappedClaims' },
+        [ordered]@{ object = $implicit; property = 'enableAccessTokenIssuance' },
+        [ordered]@{ object = $implicit; property = 'enableIdTokenIssuance' }
+    )) {
+        if (-not (Test-OptionalFalseBooleanProperty -InputObject $boundary.object -PropertyName $boundary.property)) {
+            throw "$ApplicationLabel exposes an unapproved public-client, mapped-claims, or implicit-grant authentication mode."
+        }
+    }
+    foreach ($propertyName in @('preAuthorizedApplications', 'knownClientApplications')) {
+        $value = Get-OptionalObjectPropertyValue -InputObject $api -PropertyName $propertyName
+        if ($null -ne $value -and @($value).Count -ne 0) {
+            throw "$ApplicationLabel exposes unapproved '$propertyName' client authority."
+        }
+    }
+    return $true
+}
+
+function Assert-ExactBootstrapServicePrincipalBoundary {
+    param(
+        [Parameter(Mandatory)]$ServicePrincipal,
+        [Parameter(Mandatory)][string]$ExpectedId,
+        [Parameter(Mandatory)][string]$ExpectedAppId,
+        [Parameter(Mandatory)][string]$ServicePrincipalLabel,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ExpectedServicePrincipalNames,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ExpectedTags,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$ExpectedAppRoles,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$ExpectedOauth2PermissionScopes,
+        [Parameter()][string]$ExpectedAppRoleAssigneePrincipalId = '',
+        [Parameter()][string]$ExpectedAppRoleId = '',
+        [switch]$AllowMissingExpectedAppRoleAssignment
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ExpectedAppRoleAssigneePrincipalId) -ne
+        [string]::IsNullOrWhiteSpace($ExpectedAppRoleId)) {
+        throw "$ServicePrincipalLabel expected application-role assignment boundary is incomplete."
+    }
+    if (-not ([string]$ServicePrincipal.id).Equals($ExpectedId, [StringComparison]::OrdinalIgnoreCase) -or
+        -not ([string]$ServicePrincipal.appId).Equals($ExpectedAppId, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "$ServicePrincipalLabel identity does not match the exact expected service principal."
+    }
+    if ($ServicePrincipal.accountEnabled -isnot [bool] -or $ServicePrincipal.accountEnabled -ne $true -or
+        $ServicePrincipal.appRoleAssignmentRequired -isnot [bool] -or $ServicePrincipal.appRoleAssignmentRequired -ne $false -or
+        [string]$ServicePrincipal.servicePrincipalType -cne 'Application') {
+        throw "$ServicePrincipalLabel is not the exact enabled application service-principal type and assignment mode."
+    }
+    foreach ($collectionBoundary in @(
+        [ordered]@{ property = 'alternativeNames'; expected = @() },
+        [ordered]@{ property = 'servicePrincipalNames'; expected = @($ExpectedServicePrincipalNames) },
+        [ordered]@{ property = 'tags'; expected = @($ExpectedTags) }
+    )) {
+        $collectionProperty = $ServicePrincipal.PSObject.Properties[$collectionBoundary.property]
+        if ($null -eq $collectionProperty -or $collectionProperty.Value -isnot [System.Array]) {
+            throw "$ServicePrincipalLabel '$($collectionBoundary.property)' was not returned as an exact collection."
+        }
+        $actualValues = @($collectionProperty.Value | ForEach-Object { [string]$_ })
+        if (-not (Test-ExactStringSet -Actual $actualValues -Expected @($collectionBoundary.expected))) {
+            throw "$ServicePrincipalLabel '$($collectionBoundary.property)' is outside the exact reviewed boundary."
+        }
+    }
+    foreach ($credentialPropertyName in @('passwordCredentials', 'keyCredentials')) {
+        $credentialProperty = $ServicePrincipal.PSObject.Properties[$credentialPropertyName]
+        if ($null -eq $credentialProperty -or $credentialProperty.Value -isnot [System.Array]) {
+            throw "$ServicePrincipalLabel '$credentialPropertyName' was not returned as an exact collection; credential absence was not proven."
+        }
+        if (@($credentialProperty.Value).Count -ne 0) {
+            throw "$ServicePrincipalLabel must not contain service-principal credentials."
+        }
+    }
+    foreach ($permissionBoundary in @(
+        [ordered]@{ property = 'appRoles'; expected = @($ExpectedAppRoles); allowedMemberTypes = $true },
+        [ordered]@{ property = 'oauth2PermissionScopes'; expected = @($ExpectedOauth2PermissionScopes); allowedMemberTypes = $false }
+    )) {
+        $permissionProperty = $ServicePrincipal.PSObject.Properties[$permissionBoundary.property]
+        if ($null -eq $permissionProperty -or $permissionProperty.Value -isnot [System.Array]) {
+            throw "$ServicePrincipalLabel '$($permissionBoundary.property)' was not returned as an exact collection."
+        }
+        $actualPermissions = @($permissionProperty.Value)
+        if ($actualPermissions.Count -ne @($permissionBoundary.expected).Count) {
+            throw "$ServicePrincipalLabel exposes an unapproved service-principal-local permission."
+        }
+        foreach ($expectedPermission in @($permissionBoundary.expected)) {
+            $matches = @($actualPermissions | Where-Object {
+                ([string]$_.id).Equals([string]$expectedPermission.id, [StringComparison]::OrdinalIgnoreCase)
+            })
+            if ($matches.Count -ne 1 -or
+                [string]$matches[0].value -cne [string]$expectedPermission.value -or
+                $matches[0].isEnabled -isnot [bool] -or
+                $matches[0].isEnabled -ne $expectedPermission.isEnabled) {
+                throw "$ServicePrincipalLabel exposes an unapproved service-principal-local permission."
+            }
+            if ($permissionBoundary.allowedMemberTypes) {
+                $actualMemberTypes = @($matches[0].allowedMemberTypes | ForEach-Object { [string]$_ })
+                $expectedMemberTypes = @($expectedPermission.allowedMemberTypes | ForEach-Object { [string]$_ })
+                if (-not (Test-ExactStringSet -Actual $actualMemberTypes -Expected $expectedMemberTypes)) {
+                    throw "$ServicePrincipalLabel exposes an unapproved service-principal-local application role."
+                }
+            }
+            elseif ([string]$matches[0].type -cne [string]$expectedPermission.type) {
+                throw "$ServicePrincipalLabel exposes an unapproved service-principal-local delegated scope."
+            }
+        }
+    }
+
+    $owners = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$ExpectedId/owners?`$select=id")
+    if ($owners.Count -ne 0) {
+        throw "$ServicePrincipalLabel must not have service-principal owners."
+    }
+    $memberships = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$ExpectedId/transitiveMemberOf?`$select=id")
+    if ($memberships.Count -ne 0) {
+        throw "$ServicePrincipalLabel must not have group or directory-role memberships."
+    }
+    $clientAssignments = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$ExpectedId/appRoleAssignments?`$select=id,principalId,resourceId,appRoleId")
+    if ($clientAssignments.Count -ne 0) {
+        throw "$ServicePrincipalLabel must not have client application-role assignments."
+    }
+
+    # This collection is intentionally unfiltered. Filtering to the expected
+    # operator would conceal another user, group, or service principal holding a
+    # Gateway role on a later page.
+    $resourceAssignments = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$ExpectedId/appRoleAssignedTo?`$select=id,principalId,resourceId,appRoleId")
+    $expectsAssignment = -not [string]::IsNullOrWhiteSpace($ExpectedAppRoleAssigneePrincipalId)
+    if (-not $expectsAssignment) {
+        if ($resourceAssignments.Count -ne 0) {
+            throw "$ServicePrincipalLabel has an unauthorized application-role assignee."
+        }
+    }
+    else {
+        $matchingAssignments = @($resourceAssignments | Where-Object {
+            ([string]$_.principalId).Equals($ExpectedAppRoleAssigneePrincipalId, [StringComparison]::OrdinalIgnoreCase) -and
+            ([string]$_.resourceId).Equals($ExpectedId, [StringComparison]::OrdinalIgnoreCase) -and
+            ([string]$_.appRoleId).Equals($ExpectedAppRoleId, [StringComparison]::OrdinalIgnoreCase)
+        })
+        $minimumCount = if ($AllowMissingExpectedAppRoleAssignment) { 0 } else { 1 }
+        if ($resourceAssignments.Count -gt 1 -or
+            $resourceAssignments.Count -lt $minimumCount -or
+            $matchingAssignments.Count -ne $resourceAssignments.Count) {
+            throw "$ServicePrincipalLabel application-role assignees are outside the exact reviewed boundary."
+        }
+    }
+
+    return [ordered]@{ appRoleAssignedTo = @($resourceAssignments) }
+}
+
+function Get-BootstrapApplicationTags {
+    param([Parameter(Mandatory)][string]$DeploymentOwnershipId)
+    Assert-GuidValue -Value $DeploymentOwnershipId -Label 'Deployment ownership identifier'
+    return @(
+        'A365GatewayBootstrap',
+        "A365GatewayOwnership:$(([guid]$DeploymentOwnershipId).ToString('D'))"
+    )
+}
+
+function Test-ExactStringSet {
+    param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Actual, [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Expected)
+    $actualSorted = @($Actual | Sort-Object -Unique)
+    $expectedSorted = @($Expected | Sort-Object -Unique)
+    return $Actual.Count -eq $Expected.Count -and ($actualSorted -join '|') -ceq ($expectedSorted -join '|')
+}
+
+function Assert-BootstrapApplicationOwnership {
+    param(
+        [Parameter(Mandatory)]$Application,
+        [Parameter(Mandatory)][string]$DeploymentOwnershipId,
+        [Parameter(Mandatory)][string]$OwnerObjectId,
+        [switch]$AllowAddMissingOwner
+    )
+
+    Assert-GuidValue -Value $OwnerObjectId -Label 'Bootstrap application owner object ID'
+    $expectedTags = Get-BootstrapApplicationTags -DeploymentOwnershipId $DeploymentOwnershipId
+    if (-not (Test-ExactStringSet -Actual @($Application.tags | ForEach-Object { [string]$_ }) -Expected $expectedTags)) {
+        throw 'An Entra application with the requested identity already exists without the exact unguessable bootstrap ownership marker; refusing adoption.'
+    }
+
+    $ownersUrl = "https://graph.microsoft.com/v1.0/applications/$($Application.id)/owners?`$select=id"
+    $ownerIds = @(Get-BoundedGraphCollection -InitialUrl $ownersUrl | ForEach-Object { [string]$_.id })
+    if ($ownerIds.Count -eq 0 -and $AllowAddMissingOwner) {
+        Invoke-GraphJsonBody -Method 'POST' -Url "https://graph.microsoft.com/v1.0/applications/$($Application.id)/owners/`$ref" -Body @{
+            '@odata.id' = "https://graph.microsoft.com/v1.0/directoryObjects/$OwnerObjectId"
+        } | Out-Null
+        for ($attempt = 1; $attempt -le 12; $attempt++) {
+            $ownerIds = @(Get-BoundedGraphCollection -InitialUrl $ownersUrl | ForEach-Object { [string]$_.id })
+            if ($ownerIds.Count -eq 1 -and $ownerIds[0].Equals($OwnerObjectId, [StringComparison]::OrdinalIgnoreCase)) { break }
+            if ($attempt -lt 12) { Start-Sleep -Seconds 5 }
+        }
+    }
+    if ($ownerIds.Count -ne 1 -or -not $ownerIds[0].Equals($OwnerObjectId, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The bootstrap-managed Entra application must have exactly the pinned bootstrap operator as owner; refusing ambiguous or third-party ownership.'
+    }
+    return $true
+}
+
+function Get-GraphPermissionCatalog {
+    $graph = Get-ServicePrincipalByAppId -AppId $script:GraphAppId
+    if (-not $graph) { throw 'Microsoft Graph service principal was not found in the tenant.' }
+    return [ordered]@{ servicePrincipal = $graph }
+}
+
+function Get-UniqueGraphPermissionId {
+    param(
+        [Parameter(Mandatory)]$Graph,
+        [Parameter(Mandatory)][string]$Value,
+        [Parameter(Mandatory)][ValidateSet('Scope', 'Role')][string]$Type
+    )
+    $published = if ($Type -eq 'Scope') {
+        @($Graph.oauth2PermissionScopes | Where-Object { $_.isEnabled -eq $true -and [string]$_.value -eq $Value })
+    }
+    else {
+        @($Graph.appRoles | Where-Object { $_.isEnabled -eq $true -and [string]$_.value -eq $Value -and @($_.allowedMemberTypes) -contains 'Application' })
+    }
+    if ($published.Count -ne 1) { throw "Microsoft Graph $Type '$Value' was not uniquely available." }
+    return [string]$published[0].id
+}
+
+function Test-GatewayApiPasswordCredentialBoundary {
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Credentials,
+        [ValidateNotNullOrEmpty()][string]$ExpectedCredentialName = 'a365gw-bootstrap-runtime-api-obo'
+    )
+    if ($Credentials.Count -eq 0) { return $true }
+    if ($Credentials.Count -ne 1) { return $false }
+    $credential = $Credentials[0]
+    $expiry = [DateTimeOffset]::MinValue
+    $keyId = [guid]::Empty
+    return [string]$credential.displayName -ceq $ExpectedCredentialName -and
+        [guid]::TryParse([string]$credential.keyId, [ref]$keyId) -and $keyId -ne [guid]::Empty -and
+        [DateTimeOffset]::TryParse([string]$credential.endDateTime, [ref]$expiry) -and $expiry -gt [DateTimeOffset]::UtcNow
+}
+
+function Assert-GatewayApiDelegatedPermissionBoundary {
+    param(
+        [Parameter(Mandatory)]$Identity,
+        [ValidateNotNullOrEmpty()][string]$ExpectedCredentialName = 'a365gw-bootstrap-runtime-api-obo',
+        [switch]$RequireComplete
+    )
+
+    $graph = (Get-GraphPermissionCatalog).servicePrincipal
+    $requiredValues = @('AgentRegistration.Read.All', 'AgentRegistration.ReadWrite.All')
+    $requiredIds = @($requiredValues | ForEach-Object { Get-UniqueGraphPermissionId -Graph $graph -Value $_ -Type Scope })
+    $application = Invoke-AzJson -Arguments @(
+        'rest', '--method', 'GET', '--url',
+        "https://graph.microsoft.com/v1.0/applications/$($Identity.gatewayApiApplicationObjectId)?`$select=id,appId,api,requiredResourceAccess,passwordCredentials,keyCredentials,web,spa,publicClient,isFallbackPublicClient"
+    )
+    Assert-ExactApplicationAuthenticationSurface -Application $application -ApplicationLabel 'Gateway API application' | Out-Null
+    if ([string]$application.appId -ne [string]$Identity.gatewayApiClientId -or
+        -not (Test-GatewayApiPasswordCredentialBoundary -Credentials @($application.passwordCredentials) -ExpectedCredentialName $ExpectedCredentialName) -or
+        @($application.keyCredentials).Count -ne 0 -or
+        @($application.web.redirectUris).Count -ne 0 -or
+        -not [string]::IsNullOrWhiteSpace([string]$application.web.logoutUrl) -or
+        -not [string]::IsNullOrWhiteSpace([string]$application.web.homePageUrl) -or
+        @($application.spa.redirectUris).Count -ne 0 -or
+        @($application.publicClient.redirectUris).Count -ne 0) {
+        throw 'Gateway API application identity or credential boundary is not exact.'
+    }
+    $requirements = @($application.requiredResourceAccess)
+    if ($requirements.Count -gt 1 -or
+        ($requirements.Count -eq 1 -and -not ([string]$requirements[0].resourceAppId).Equals($script:GraphAppId, [StringComparison]::OrdinalIgnoreCase))) {
+        throw 'Gateway API requiredResourceAccess contains an unapproved resource or duplicate Graph entry.'
+    }
+    $actualIds = @()
+    if ($requirements.Count -eq 1) {
+        $access = @($requirements[0].resourceAccess)
+        if (@($access | Where-Object { [string]$_.type -cne 'Scope' -or [string]$_.id -notin $requiredIds }).Count -gt 0) {
+            throw 'Gateway API requiredResourceAccess contains an unapproved Microsoft Graph permission.'
+        }
+        $actualIds = @($access | ForEach-Object { [string]$_.id })
+        if (@($actualIds | Sort-Object -Unique).Count -ne $actualIds.Count) { throw 'Gateway API requiredResourceAccess contains duplicate permissions.' }
+    }
+    if ($RequireComplete -and -not (Test-ExactStringSet -Actual $actualIds -Expected $requiredIds)) {
+        throw 'Gateway API requiredResourceAccess is not the exact two-scope delegated Registry boundary.'
+    }
+
+    $grants = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/oauth2PermissionGrants?`$filter=clientId%20eq%20'$($Identity.gatewayApiServicePrincipalId)'&`$select=id,clientId,resourceId,consentType,scope")
+    if ($grants.Count -gt 1) { throw 'Gateway API has more than one delegated permission grant; refusing an ambiguous consent boundary.' }
+    $grantScopes = @()
+    if ($grants.Count -eq 1) {
+        if (-not ([string]$grants[0].resourceId).Equals([string]$graph.id, [StringComparison]::OrdinalIgnoreCase) -or
+            [string]$grants[0].consentType -cne 'AllPrincipals') {
+            throw 'Gateway API has a delegated grant outside the exact tenant-wide Microsoft Graph boundary.'
+        }
+        $grantScopes = @(([string]$grants[0].scope).Split(' ', [StringSplitOptions]::RemoveEmptyEntries -bor [StringSplitOptions]::TrimEntries))
+        if (@($grantScopes | Where-Object { $_ -notin $requiredValues }).Count -gt 0 -or
+            @($grantScopes | Sort-Object -Unique).Count -ne $grantScopes.Count) {
+            throw 'Gateway API delegated consent contains an unapproved or duplicate scope.'
+        }
+    }
+    if ($RequireComplete -and -not (Test-ExactStringSet -Actual $grantScopes -Expected $requiredValues)) {
+        throw 'Gateway API delegated consent is not the exact two-scope Registry boundary.'
+    }
+    return $true
+}
+
+function Ensure-GatewayApiDelegatedRegistryConsent {
+    param(
+        [Parameter(Mandatory)]$Identity,
+        [ValidateNotNullOrEmpty()][string]$ExpectedCredentialName = 'a365gw-bootstrap-runtime-api-obo',
+        [switch]$ReconcileOnly
+    )
+
+    # Call only after application/principal ownership has been verified.
+    # Reject broader or ambiguous grants before making any tenant change.
+    Assert-GatewayApiDelegatedPermissionBoundary -Identity $Identity -ExpectedCredentialName $ExpectedCredentialName | Out-Null
+    if ($ReconcileOnly) {
+        Assert-GatewayApiDelegatedPermissionBoundary -Identity $Identity -ExpectedCredentialName $ExpectedCredentialName -RequireComplete | Out-Null
+        return
+    }
+    $graph = (Get-GraphPermissionCatalog).servicePrincipal
+    $requiredValues = @('AgentRegistration.Read.All', 'AgentRegistration.ReadWrite.All')
+    $access = @($requiredValues | ForEach-Object {
+        @{ id = Get-UniqueGraphPermissionId -Graph $graph -Value $_ -Type Scope; type = 'Scope' }
+    })
+    Invoke-GraphJsonBody -Method PATCH -Url "https://graph.microsoft.com/v1.0/applications/$($Identity.gatewayApiApplicationObjectId)" -Body @{
+        requiredResourceAccess = @(@{ resourceAppId = $script:GraphAppId; resourceAccess = $access })
+    } | Out-Null
+    $grantUrl = "https://graph.microsoft.com/v1.0/oauth2PermissionGrants?`$filter=clientId%20eq%20'$($Identity.gatewayApiServicePrincipalId)'&`$select=id,clientId,resourceId,consentType,scope"
+    $grants = @(Get-BoundedGraphCollection -InitialUrl $grantUrl)
+    Assert-GatewayApiDelegatedPermissionBoundary -Identity $Identity -ExpectedCredentialName $ExpectedCredentialName | Out-Null
+    if ($grants.Count -eq 0) {
+        Invoke-GraphJsonBody -Method POST -Url 'https://graph.microsoft.com/v1.0/oauth2PermissionGrants' -Body @{
+            clientId = [string]$Identity.gatewayApiServicePrincipalId
+            resourceId = [string]$graph.id
+            consentType = 'AllPrincipals'
+            scope = $requiredValues -join ' '
+        } | Out-Null
+    } elseif ($grants.Count -eq 1) {
+        $existing = @(([string]$grants[0].scope).Split(' ', [StringSplitOptions]::RemoveEmptyEntries))
+        if (-not (Test-ExactStringSet -Actual $existing -Expected $requiredValues)) {
+            Invoke-GraphJsonBody -Method PATCH -Url "https://graph.microsoft.com/v1.0/oauth2PermissionGrants/$($grants[0].id)" -Body @{
+                scope = $requiredValues -join ' '
+            } | Out-Null
+        }
+    } else { throw 'Gateway API delegated consent changed during setup; review its exact permission boundary.' }
+    Assert-GatewayApiDelegatedPermissionBoundary -Identity $Identity -ExpectedCredentialName $ExpectedCredentialName -RequireComplete | Out-Null
+}
+
+function Assert-GraphApplicationRoleAssignmentBoundary {
+    param(
+        [Parameter(Mandatory)][string]$PrincipalId,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ExpectedRoleValues,
+        [switch]$RequireComplete
+    )
+    $graph = (Get-GraphPermissionCatalog).servicePrincipal
+    $expectedIds = @($ExpectedRoleValues | ForEach-Object { Get-UniqueGraphPermissionId -Graph $graph -Value $_ -Type Role })
+    $assignments = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$PrincipalId/appRoleAssignments?`$select=id,principalId,resourceId,appRoleId")
+    if (@($assignments | Where-Object { [string]$_.principalId -ine $PrincipalId }).Count -ne 0) {
+        throw 'Workload identity has an application-role assignment outside the exact reviewed principal boundary.'
+    }
+    $graphAssignments = @($assignments | Where-Object { [string]$_.resourceId -ieq [string]$graph.id })
+    $otherAssignments = @($assignments | Where-Object { [string]$_.resourceId -ine [string]$graph.id })
+    if ($otherAssignments.Count -ne 0) {
+        throw 'Workload identity has an application-role assignment outside the exact reviewed Microsoft Graph boundary.'
+    }
+    if (@($graphAssignments | Where-Object {
+        [string]$_.appRoleId -notin $expectedIds
+    }).Count -gt 0) {
+        throw 'Workload identity has an application-role assignment outside the exact reviewed Microsoft Graph boundary.'
+    }
+    $actualIds = @($graphAssignments | ForEach-Object { [string]$_.appRoleId })
+    if (@($actualIds | Sort-Object -Unique).Count -ne $actualIds.Count) {
+        throw 'Workload identity has duplicate Microsoft Graph application-role assignments.'
+    }
+    if ($RequireComplete -and -not (Test-ExactStringSet -Actual $actualIds -Expected $expectedIds)) {
+        throw 'Workload identity Microsoft Graph application roles do not exactly match the reviewed allowlist.'
+    }
+    return $true
+}
+
+function Assert-ExactGraphApplicationRoleAssignments {
+    param(
+        [Parameter(Mandatory)][string]$PrincipalId,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ExpectedRoleValues
+    )
+    return Assert-GraphApplicationRoleAssignmentBoundary -PrincipalId $PrincipalId -ExpectedRoleValues $ExpectedRoleValues -RequireComplete
+}
+
+function Ensure-ServicePrincipal {
+    param(
+        [Parameter(Mandatory)][string]$AppId,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ServicePrincipalNames,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Tags
+    )
+    $principal = Get-ServicePrincipalByAppId -AppId $AppId
+    if (-not $principal) {
+        Invoke-GraphJsonBody -Method 'POST' -Url 'https://graph.microsoft.com/v1.0/servicePrincipals' -Body @{
+            appId = $AppId
+            accountEnabled = $true
+            appRoleAssignmentRequired = $false
+            servicePrincipalNames = @($ServicePrincipalNames)
+            tags = @($Tags)
+        } | Out-Null
+        for ($attempt = 1; $attempt -le 12 -and -not $principal; $attempt++) {
+            Start-Sleep -Seconds 5
+            $principal = Get-ServicePrincipalByAppId -AppId $AppId
+        }
+    }
+    if (-not $principal) { throw "Service principal for application $AppId was not observable after creation." }
+    return $principal
+}
+
+function Get-BootstrapInitialTenantDomain {
+    # Microsoft documents a known issue with $filter on the domains collection, and the
+    # service rejects a filtered request outright, so the initial domain is selected from
+    # the returned collection instead of being requested by server-side filter.
+    $domains = @(@(Get-BoundedGraphCollection -InitialUrl (
+        'https://graph.microsoft.com/v1.0/domains')) | Where-Object { $_.isInitial -eq $true })
+    if ($domains.Count -ne 1 -or
+        $domains[0].isInitial -ne $true -or
+        $domains[0].isVerified -ne $true -or
+        [string]$domains[0].id -cnotmatch '^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?[.][A-Za-z]{2,}$') {
+        throw 'The tenant initial verified domain required for Purview app-only authentication was not unique.'
+    }
+    return ([string]$domains[0].id).ToLowerInvariant()
+}
+
+function Get-BootstrapPurviewExchangeRole {
+    # The compliance endpoint's resource is Exchange Online; EOP's similarly named role is a different grant.
+    $exchange = Get-ServicePrincipalByAppId -AppId $script:PurviewExchangeOnlineAppId
+    if (-not $exchange -or [string]$exchange.appId -cne $script:PurviewExchangeOnlineAppId -or
+        @($exchange.servicePrincipalNames) -cnotcontains 'https://ps.compliance.protection.outlook.com') {
+        throw 'The exact Exchange Online resource for Security and Compliance PowerShell was not found in the tenant.'
+    }
+    $roles = @($exchange.appRoles | Where-Object {
+        [string]$_.id -ceq $script:PurviewExchangeManageAsAppRoleId -and
+        [string]$_.value -ceq 'Exchange.ManageAsApp' -and
+        $_.isEnabled -eq $true -and
+        @($_.allowedMemberTypes) -contains 'Application'
+    })
+    if ($roles.Count -ne 1) {
+        throw 'Exchange Online Exchange.ManageAsApp was not uniquely available.'
+    }
+    return [ordered]@{
+        servicePrincipalId = ([guid][string]$exchange.id).ToString('D')
+        roleId = $script:PurviewExchangeManageAsAppRoleId
+    }
+}
+
+function Ensure-GatewayApiApplication {
+    param(
+        [Parameter(Mandatory)]$Config,
+        [Parameter(Mandatory)]$AzureIdentity,
+        [Parameter(Mandatory)][string]$DeploymentOwnershipId,
+        [switch]$ReconcileOnly
+    )
+    # Entra application display names and identifier URIs are tenant-scoped. The
+    # environment alone is not a safe deployment identity when a tenant hosts more
+    # than one Gateway, so bind both to the configured project discriminator.
+    $displayName = "A365 Gateway API - $($Config.projectName)-$($Config.environment)"
+    $audience = "api://a365-gateway-$($Config.projectName)-$($Config.environment)"
+    $expectedCredentialName = Get-RuntimeCredentialName -Config $Config -Purpose 'api-obo'
+    $application = Get-ExactApplicationByDisplayName -DisplayName $displayName
+    if (-not $application) {
+        $audienceMatches = @(Get-ApplicationsByExactIdentifierUri -IdentifierUri $audience)
+        if ($audienceMatches.Count -gt 0) { throw "The requested Gateway API audience '$audience' is already owned by an application that is not bound to this bootstrap state; refusing adoption." }
+        if ($ReconcileOnly) { throw 'The state-owned Gateway API application was not observable during read-only reconciliation.' }
+    }
+    if (-not $application) {
+        $roles = @(
+            @{ id = [guid]::NewGuid(); displayName = 'Gateway Administrator'; description = 'Full Gateway control-plane administration.'; value = 'Gateway.Administrator'; allowedMemberTypes = @('User'); isEnabled = $true },
+            @{ id = [guid]::NewGuid(); displayName = 'Gateway Operator'; description = 'Operate registrations and provisioning.'; value = 'Gateway.Operator'; allowedMemberTypes = @('User'); isEnabled = $true },
+            @{ id = [guid]::NewGuid(); displayName = 'Gateway Auditor'; description = 'Read Gateway audit and configuration state.'; value = 'Gateway.Auditor'; allowedMemberTypes = @('User'); isEnabled = $true },
+            @{ id = [guid]::NewGuid(); displayName = 'Gateway Support Reader'; description = 'Read redacted health and diagnostics.'; value = 'Gateway.SupportReader'; allowedMemberTypes = @('User'); isEnabled = $true }
+        )
+        $scopeId = [guid]::NewGuid()
+        $application = Invoke-GraphJsonBody -Method 'POST' -Url 'https://graph.microsoft.com/v1.0/applications' -Body @{
+            displayName = $displayName
+            signInAudience = 'AzureADMyOrg'
+            identifierUris = @($audience)
+            tags = Get-BootstrapApplicationTags -DeploymentOwnershipId $DeploymentOwnershipId
+            isFallbackPublicClient = $false
+            web = @{ implicitGrantSettings = @{ enableAccessTokenIssuance = $false; enableIdTokenIssuance = $false } }
+            api = @{ requestedAccessTokenVersion = 2; acceptMappedClaims = $false; preAuthorizedApplications = @(); knownClientApplications = @(); oauth2PermissionScopes = @(@{
+                id = $scopeId; value = 'access_as_user'; type = 'Admin'; isEnabled = $true
+                adminConsentDisplayName = 'Access the A365 Gateway'
+                adminConsentDescription = 'Allows the Admin UI to access the A365 Gateway on behalf of the signed-in user.'
+                userConsentDisplayName = 'Access the A365 Gateway'
+                userConsentDescription = 'Allows this application to access the A365 Gateway on your behalf.'
+            }) }
+            appRoles = $roles
+        }
+    }
+    $application = Invoke-AzJson -Arguments @(
+        'rest', '--method', 'GET', '--url',
+        "https://graph.microsoft.com/v1.0/applications/$($application.id)?`$select=id,appId,displayName,signInAudience,identifierUris,tags,api,appRoles,requiredResourceAccess,passwordCredentials,keyCredentials,web,spa,publicClient,isFallbackPublicClient"
+    )
+    Assert-ExactApplicationAuthenticationSurface -Application $application -ApplicationLabel 'Gateway API application' | Out-Null
+    if ([string]$application.displayName -cne $displayName -or
+        [string]$application.signInAudience -cne 'AzureADMyOrg' -or
+        @($application.identifierUris).Count -ne 1 -or
+        [string]$application.identifierUris[0] -cne $audience -or
+        -not (Test-GatewayApiPasswordCredentialBoundary -Credentials @($application.passwordCredentials) -ExpectedCredentialName $expectedCredentialName) -or
+        @($application.keyCredentials).Count -ne 0 -or
+        @($application.web.redirectUris).Count -ne 0 -or
+        -not [string]::IsNullOrWhiteSpace([string]$application.web.logoutUrl) -or
+        -not [string]::IsNullOrWhiteSpace([string]$application.web.homePageUrl) -or
+        @($application.spa.redirectUris).Count -ne 0 -or
+        @($application.publicClient.redirectUris).Count -ne 0 -or
+        [int]$application.api.requestedAccessTokenVersion -ne 2) {
+        throw 'Gateway API application does not match the exact single-tenant audience and profile-specific credential boundary.'
+    }
+    $scope = @($application.api.oauth2PermissionScopes | Where-Object value -eq 'access_as_user')
+    if (@($application.api.oauth2PermissionScopes).Count -ne 1 -or $scope.Count -ne 1 -or
+        $scope[0].isEnabled -ne $true -or [string]$scope[0].type -cne 'Admin') {
+        throw 'Gateway API must publish exactly the enabled admin-consent access_as_user scope.'
+    }
+    $expectedRoleValues = @('Gateway.Administrator', 'Gateway.Operator', 'Gateway.Auditor', 'Gateway.SupportReader')
+    $actualRoleValues = @($application.appRoles | ForEach-Object { [string]$_.value })
+    if (-not (Test-ExactStringSet -Actual $actualRoleValues -Expected $expectedRoleValues) -or
+        @($application.appRoles | Where-Object { $_.isEnabled -ne $true -or @($_.allowedMemberTypes).Count -ne 1 -or [string]$_.allowedMemberTypes[0] -cne 'User' }).Count -gt 0) {
+        throw 'Gateway API must publish exactly the four user-only Gateway roles.'
+    }
+    # Ownership repair is permitted only after the immutable application shape
+    # has passed exact readback.
+    Assert-BootstrapApplicationOwnership -Application $application -DeploymentOwnershipId $DeploymentOwnershipId -OwnerObjectId ([string]$AzureIdentity.userObjectId) -AllowAddMissingOwner:(-not $ReconcileOnly) | Out-Null
+    $adminRole = @($application.appRoles | Where-Object value -eq 'Gateway.Administrator')
+    $expectedServicePrincipalTags = @(Get-BootstrapApplicationTags -DeploymentOwnershipId $DeploymentOwnershipId)
+    $principal = if ($ReconcileOnly) {
+        Get-ServicePrincipalByAppId -AppId ([string]$application.appId)
+    }
+    else {
+        Ensure-ServicePrincipal `
+            -AppId ([string]$application.appId) `
+            -ServicePrincipalNames @([string]$application.appId, $audience) `
+            -Tags $expectedServicePrincipalTags
+    }
+    if (-not $principal) { throw 'Gateway API service principal was not observable during read-only reconciliation.' }
+    $gatewayApiServicePrincipalId = [string]$principal.id
+    $principalBoundaryArguments = @{
+        ServicePrincipal = $principal
+        ExpectedId = $gatewayApiServicePrincipalId
+        ExpectedAppId = [string]$application.appId
+        ServicePrincipalLabel = 'Gateway API service principal'
+        ExpectedServicePrincipalNames = @([string]$application.appId, $audience)
+        ExpectedTags = $expectedServicePrincipalTags
+        ExpectedAppRoles = @($application.appRoles)
+        ExpectedOauth2PermissionScopes = @($application.api.oauth2PermissionScopes)
+        ExpectedAppRoleAssigneePrincipalId = [string]$AzureIdentity.userObjectId
+        ExpectedAppRoleId = [string]$adminRole[0].id
+    }
+    $principalBoundary = Assert-ExactBootstrapServicePrincipalBoundary @principalBoundaryArguments -AllowMissingExpectedAppRoleAssignment
+    $gatewayApiIdentityBoundary = [ordered]@{
+        gatewayApiApplicationObjectId = [string]$application.id
+        gatewayApiClientId = [string]$application.appId
+        gatewayApiServicePrincipalId = $gatewayApiServicePrincipalId
+    }
+    Assert-GatewayApiDelegatedPermissionBoundary -Identity $gatewayApiIdentityBoundary -ExpectedCredentialName $expectedCredentialName | Out-Null
+    $userAssignments = @($principalBoundary.appRoleAssignedTo)
+    if ($userAssignments.Count -eq 0) {
+        if ($ReconcileOnly) { throw 'Gateway Administrator assignment was not observable during read-only reconciliation.' }
+        Invoke-GraphJsonBody -Method 'POST' -Url "https://graph.microsoft.com/v1.0/servicePrincipals/$($principal.id)/appRoleAssignedTo" -Body @{
+            principalId = [string]$AzureIdentity.userObjectId
+            resourceId = [string]$principal.id
+            appRoleId = [string]$adminRole[0].id
+        } | Out-Null
+        for ($attempt = 1; $attempt -le 12; $attempt++) {
+            $principal = Get-ServicePrincipalByAppId -AppId ([string]$application.appId)
+            if (-not $principal) { throw 'Gateway API service principal disappeared during exact role-assignment readback.' }
+            $principalBoundaryArguments.ServicePrincipal = $principal
+            $principalBoundary = Assert-ExactBootstrapServicePrincipalBoundary @principalBoundaryArguments -AllowMissingExpectedAppRoleAssignment
+            $userAssignments = @($principalBoundary.appRoleAssignedTo)
+            if ($userAssignments.Count -eq 1) { break }
+            if ($attempt -lt 12) { Start-Sleep -Seconds 5 }
+        }
+        if ($userAssignments.Count -ne 1) {
+            throw 'The exact Gateway Administrator assignment was not observable after creation.'
+        }
+    }
+    $principal = Get-ServicePrincipalByAppId -AppId ([string]$application.appId)
+    if (-not $principal) { throw 'Gateway API service principal disappeared during final exact readback.' }
+    $principalBoundaryArguments.ServicePrincipal = $principal
+    Assert-ExactBootstrapServicePrincipalBoundary @principalBoundaryArguments | Out-Null
+    Assert-GatewayApiDelegatedPermissionBoundary -Identity $gatewayApiIdentityBoundary -ExpectedCredentialName $expectedCredentialName | Out-Null
+    if ($Config.environment -eq 'dev' -and
+        $Config.agent365.allowDevelopmentRegistryPreview -and $Config.agent365.registryBetaAcknowledged) {
+        Ensure-GatewayApiDelegatedRegistryConsent -Identity $gatewayApiIdentityBoundary -ExpectedCredentialName $expectedCredentialName -ReconcileOnly:$ReconcileOnly
+    }
+    return [ordered]@{
+        gatewayApiApplicationObjectId = [string]$application.id
+        gatewayApiClientId = [string]$application.appId
+        gatewayApiServicePrincipalId = [string]$principal.id
+        gatewayApiScopeBaseUri = $audience
+        gatewayApiTokenAudience = [string]$application.appId
+        gatewayApiAccessScopeId = [string]$scope[0].id
+        gatewayAdministratorRoleId = [string]$adminRole[0].id
+        deploymentOwnershipId = ([guid]$DeploymentOwnershipId).ToString('D')
+        ownerObjectId = [string]$AzureIdentity.userObjectId
+        userObjectId = [string]$AzureIdentity.userObjectId
+        userPrincipalName = [string]$AzureIdentity.userPrincipalName
+    }
+}
+
+function Ensure-GraphApplicationRoleAssignment {
+    param([Parameter(Mandatory)][string]$PrincipalId, [Parameter(Mandatory)][string]$RoleValue)
+    $graph = Get-ServicePrincipalByAppId -AppId $script:GraphAppId
+    if (-not $graph) { throw 'Microsoft Graph service principal was not found in the tenant.' }
+    $role = @($graph.appRoles | Where-Object { $_.value -eq $RoleValue -and $_.isEnabled -eq $true -and @($_.allowedMemberTypes) -contains 'Application' })
+    if ($role.Count -ne 1) { throw "Microsoft Graph application role '$RoleValue' was not uniquely available." }
+    $existing = @(Get-BoundedGraphCollection -InitialUrl "https://graph.microsoft.com/v1.0/servicePrincipals/$PrincipalId/appRoleAssignments?`$select=id,resourceId,appRoleId")
+    if (@($existing | Where-Object { [string]$_.resourceId -eq [string]$graph.id -and [string]$_.appRoleId -eq [string]$role[0].id }).Count -eq 0) {
+        Invoke-GraphJsonBody -Method 'POST' -Url "https://graph.microsoft.com/v1.0/servicePrincipals/$PrincipalId/appRoleAssignments" -Body @{
+            principalId = $PrincipalId; resourceId = [string]$graph.id; appRoleId = [string]$role[0].id
+        } | Out-Null
+    }
+    return [string]$role[0].id
+}
+
+function Ensure-RuntimeConsoleApplication {
+    param(
+        [Parameter(Mandatory)]$Config,
+        [Parameter(Mandatory)]$Identity,
+        [Parameter(Mandatory)][string]$DeploymentOwnershipId,
+        [Parameter(Mandatory)][int]$ConsoleHostPort
+    )
+
+    if ($ConsoleHostPort -lt 1 -or $ConsoleHostPort -gt 65535) {
+        throw 'Runtime Console host port is out of range.'
+    }
+
+    $displayName = "A365 Gateway Console - $($Config.projectName)-$($Config.environment)"
+    $consoleOrigins = @("http://127.0.0.1:$ConsoleHostPort", "http://localhost:$ConsoleHostPort")
+    $expectedTags = @(Get-BootstrapApplicationTags -DeploymentOwnershipId $DeploymentOwnershipId)
+    $application = Get-ExactApplicationByDisplayName -DisplayName $displayName
+    if (-not $application) {
+        $application = Invoke-GraphJsonBody -Method 'POST' -Url 'https://graph.microsoft.com/v1.0/applications' -Body @{
+            displayName = $displayName
+            signInAudience = 'AzureADMyOrg'
+            tags = $expectedTags
+            isFallbackPublicClient = $false
+            spa = @{ redirectUris = $consoleOrigins }
+            web = @{ implicitGrantSettings = @{ enableAccessTokenIssuance = $false; enableIdTokenIssuance = $false } }
+            api = @{ acceptMappedClaims = $false; preAuthorizedApplications = @(); knownClientApplications = @() }
+            requiredResourceAccess = @(@{
+                resourceAppId = [string]$Identity.gatewayApiClientId
+                resourceAccess = @(@{ id = [string]$Identity.gatewayApiAccessScopeId; type = 'Scope' })
+            })
+        }
+    }
+
+    $application = Invoke-AzJson -Arguments @(
+        'rest', '--method', 'GET', '--url',
+        "https://graph.microsoft.com/v1.0/applications/$($application.id)?`$select=id,appId,displayName,signInAudience,identifierUris,tags,api,appRoles,requiredResourceAccess,passwordCredentials,keyCredentials,web,spa,publicClient,isFallbackPublicClient"
+    )
+    Assert-ExactApplicationAuthenticationSurface -Application $application -ApplicationLabel 'Runtime Console application' | Out-Null
+
+    $spaRedirects = @($application.spa.redirectUris | ForEach-Object { [string]$_ })
+    $apiRequirements = @($application.requiredResourceAccess)
+    $exactRequiredScope = $apiRequirements.Count -eq 1 -and
+        ([string]$apiRequirements[0].resourceAppId).Equals([string]$Identity.gatewayApiClientId, [StringComparison]::OrdinalIgnoreCase) -and
+        @($apiRequirements[0].resourceAccess).Count -eq 1 -and
+        ([string]$apiRequirements[0].resourceAccess[0].id).Equals([string]$Identity.gatewayApiAccessScopeId, [StringComparison]::OrdinalIgnoreCase) -and
+        [string]$apiRequirements[0].resourceAccess[0].type -ceq 'Scope'
+
+    if ([string]$application.displayName -cne $displayName -or
+        [string]$application.signInAudience -cne 'AzureADMyOrg' -or
+        @($application.identifierUris).Count -ne 0 -or
+        @($application.passwordCredentials).Count -ne 0 -or
+        @($application.keyCredentials).Count -ne 0 -or
+        @($application.web.redirectUris).Count -ne 0 -or
+        @($application.publicClient.redirectUris).Count -ne 0 -or
+        -not $exactRequiredScope) {
+        throw 'Runtime Console application does not match the exact SPA, permission, and credential-free boundary.'
+    }
+
+    if (-not (Test-ExactStringSet -Actual $spaRedirects -Expected $consoleOrigins)) {
+        Invoke-GraphJsonBody -Method 'PATCH' -Url "https://graph.microsoft.com/v1.0/applications/$($application.id)" -Body @{
+            spa = @{ redirectUris = $consoleOrigins }
+        } | Out-Null
+    }
+
+    Assert-BootstrapApplicationOwnership `
+        -Application $application `
+        -DeploymentOwnershipId $DeploymentOwnershipId `
+        -OwnerObjectId ([string]$Identity.userObjectId) `
+        -AllowAddMissingOwner | Out-Null
+
+    $principal = Ensure-ServicePrincipal `
+        -AppId ([string]$application.appId) `
+        -ServicePrincipalNames @([string]$application.appId) `
+        -Tags $expectedTags
+
+    $grantUrl = "https://graph.microsoft.com/v1.0/oauth2PermissionGrants?`$filter=clientId%20eq%20'$($principal.id)'&`$select=id,clientId,resourceId,consentType,scope"
+    $grant = @(Get-BoundedGraphCollection -InitialUrl $grantUrl)
+    if ($grant.Count -eq 0) {
+        Invoke-GraphJsonBody -Method 'POST' -Url 'https://graph.microsoft.com/v1.0/oauth2PermissionGrants' -Body @{
+            clientId = [string]$principal.id
+            consentType = 'AllPrincipals'
+            resourceId = [string]$Identity.gatewayApiServicePrincipalId
+            scope = 'access_as_user'
+        } | Out-Null
+        $grant = @(Get-BoundedGraphCollection -InitialUrl $grantUrl)
+    }
+    $grantScopes = if ($grant.Count -eq 1) {
+        @(([string]$grant[0].scope).Split(' ', [StringSplitOptions]::RemoveEmptyEntries -bor [StringSplitOptions]::TrimEntries))
+    }
+    else { @() }
+    if ($grant.Count -ne 1 -or
+        -not ([string]$grant[0].resourceId).Equals([string]$Identity.gatewayApiServicePrincipalId, [StringComparison]::OrdinalIgnoreCase) -or
+        [string]$grant[0].consentType -cne 'AllPrincipals' -or
+        -not (Test-ExactStringSet -Actual $grantScopes -Expected @('access_as_user'))) {
+        throw 'Runtime Console delegated consent must be exactly one tenant-wide access_as_user grant to this Gateway API.'
+    }
+
+    return [ordered]@{
+        consoleApplicationObjectId = [string]$application.id
+        consoleClientId = [string]$application.appId
+        consoleServicePrincipalId = [string]$principal.id
+        consoleUrl = $consoleOrigins[0]
+        apiScope = "$([string]$Identity.gatewayApiScopeBaseUri)/access_as_user"
+        deploymentOwnershipId = ([guid]$DeploymentOwnershipId).ToString('D')
+    }
+}
+
+Export-ModuleMember -Function *

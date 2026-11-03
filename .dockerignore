@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.user
+.git/
+.bootstrap/
+.agent-runtime/
+.maintenance/
+.playwright*/
+**/node_modules/
+web/console/dist/
+**/.env
+**/.env.*

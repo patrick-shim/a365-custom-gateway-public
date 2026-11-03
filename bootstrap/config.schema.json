@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a365gateway.local/bootstrap/config.schema.json",
+  "title": "A365 Custom Gateway bootstrap configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "environment",
+    "projectName",
+    "agent365",
+    "promptShield",
+    "purview",
+    "deployProfile",
+    "runtime"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "deployProfile": {
+      "const": "runtime",
+      "description": "Runtime gateway deployment. Legacy Azure hosting is retired."
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "apiHostPort",
+        "consoleHostPort"
+      ],
+      "properties": {
+        "apiHostPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 5080
+        },
+        "consoleHostPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 5081,
+          "description": "Host port for the React Fluent Console (primary runtime UI)."
+        },
+        "composeProjectName": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+          "description": "Stable Docker Compose project name. Keep this unchanged for an existing deployment.",
+          "type": "string"
+        },
+        "credentialLabelPrefix": {
+          "pattern": "^[a-zA-Z0-9_-]{1,100}$",
+          "description": "Stable label prefix for the three bootstrap credentials. Keep this unchanged for an existing deployment.",
+          "type": "string"
+        }
+      }
+    },
+    "subscriptionId": {
+      "type": "string",
+      "format": "uuid",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ]
+    },
+    "location": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+$"
+    },
+    "projectName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,7}$"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 90,
+      "pattern": "^(?=.{1,90}$)[A-Za-z0-9._()\\-]*[A-Za-z0-9_()\\-]$"
+    },
+    "agent365": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seedBlueprintName",
+        "allowDevelopmentRegistryPreview",
+        "registryBetaAcknowledged",
+        "reviewedManagerApplicationIds"
+      ],
+      "properties": {
+        "seedBlueprintName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "allowDevelopmentRegistryPreview": {
+          "type": "boolean"
+        },
+        "registryBetaAcknowledged": {
+          "type": "boolean"
+        },
+        "reviewedManagerApplicationIds": {
+          "type": "array",
+          "description": "Independently reviewed Microsoft first-party application IDs, unique by GUID identity regardless of letter casing.",
+          "$comment": "uniqueItems enforces only case-sensitive JSON string uniqueness. Read-BootstrapConfig in bootstrap/modules/Common.psm1 provides the supplemental case-insensitive GUID uniqueness guard and accepts valid uppercase or mixed-case GUIDs. Schema validation alone does not establish that guard.",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$",
+            "not": {
+              "const": "00000000-0000-0000-0000-000000000000"
+            }
+          }
+        }
+      }
+    },
+    "promptShield": {
+      "type": "object",
+      "description": "Azure AI Content Safety for Prompt Shields. Explicitly selected during setup; per-agent usage is configured later.",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "skuName",
+        "costAndQuotaAcknowledged"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "skuName": {
+          "enum": [
+            "F0",
+            "S0"
+          ]
+        },
+        "costAndQuotaAcknowledged": {
+          "type": "boolean"
+        }
+      }
+    },
+    "purview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "authorityRequirementsAcknowledged"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "authorityRequirementsAcknowledged": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "deployProfile": {
+            "const": "runtime"
+          }
+        },
+        "required": [
+          "deployProfile"
+        ]
+      },
+      "then": {
+        "required": [
+          "runtime"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "deployProfile": {
+            "const": "runtime"
+          },
+          "promptShield": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "deployProfile",
+          "promptShield"
+        ]
+      },
+      "then": {
+        "required": [
+          "subscriptionId",
+          "location",
+          "resourceGroupName"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent365": {
+            "properties": {
+              "allowDevelopmentRegistryPreview": {
+                "const": true
+              }
+            },
+            "required": [
+              "allowDevelopmentRegistryPreview"
+            ]
+          }
+        },
+        "required": [
+          "agent365"
+        ]
+      },
+      "then": {
+        "properties": {
+          "environment": {
+            "const": "dev"
+          },
+          "agent365": {
+            "properties": {
+              "registryBetaAcknowledged": {
+                "const": true
+              }
+            },
+            "required": [
+              "registryBetaAcknowledged"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "promptShield": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "promptShield"
+        ]
+      },
+      "then": {
+        "properties": {
+          "promptShield": {
+            "properties": {
+              "costAndQuotaAcknowledged": {
+                "const": true
+              }
+            },
+            "required": [
+              "costAndQuotaAcknowledged"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "purview": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "purview"
+        ]
+      },
+      "then": {
+        "properties": {
+          "purview": {
+            "properties": {
+              "authorityRequirementsAcknowledged": {
+                "const": true
+              }
+            },
+            "required": [
+              "authorityRequirementsAcknowledged"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

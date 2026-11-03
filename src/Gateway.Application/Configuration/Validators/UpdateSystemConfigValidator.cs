@@ -1,0 +1,80 @@
+using FluentValidation;
+using Gateway.Application.Configuration.Commands;
+using Gateway.Domain.Enums;
+
+namespace Gateway.Application.Configuration.Validators;
+
+public sealed class UpdateSystemConfigValidator : AbstractValidator<UpdateSystemConfigCommand>
+{
+    public UpdateSystemConfigValidator()
+    {
+
+        RuleFor(x => x.RetentionDaysIdempotencyRecords)
+            .InclusiveBetween(1, 3_650)
+            .When(x => x.RetentionDaysIdempotencyRecords is not null)
+            .WithMessage("RetentionDaysIdempotencyRecords must be between 1 and 3650 days.");
+        RuleFor(x => x.RateLimitPerClient)
+            .InclusiveBetween(1, 10_000_000)
+            .When(x => x.RateLimitPerClient is not null)
+            .WithMessage("RateLimitPerClient must be between 1 and 10000000 requests per minute.");
+        RuleFor(x => x.RateLimitPerAgent)
+            .InclusiveBetween(1, 10_000_000)
+            .When(x => x.RateLimitPerAgent is not null)
+            .WithMessage("RateLimitPerAgent must be between 1 and 10000000 requests per minute.");
+        RuleFor(x => x.RateLimitGlobal)
+            .InclusiveBetween(1, 10_000_000)
+            .When(x => x.RateLimitGlobal is not null)
+            .WithMessage("RateLimitGlobal must be between 1 and 10000000 requests per minute.");
+
+        RuleFor(x => x.DefaultObservabilityMode)
+            .Must(BeValidObservabilityMode)
+            .WithMessage("DefaultObservabilityMode must be a valid value.")
+            .When(x => x.DefaultObservabilityMode is not null);
+
+
+        RuleFor(x => x)
+            .Must(HaveCompatibleObservabilitySettings)
+            .WithMessage("Combined and destination-specific observability settings must describe the same destinations.")
+            .OverridePropertyName(nameof(UpdateSystemConfigCommand.DefaultObservabilityMode));
+
+        RuleFor(x => x.IdempotencyKey)
+            .Must(value =>
+            {
+                if (value is null)
+                    return true;
+                if (value == Guid.Empty)
+                    return false;
+                var canonical = value.Value.ToString("D");
+                return canonical[14] == '4' &&
+                    canonical[19] is '8' or '9' or 'a' or 'b';
+            })
+            .WithMessage("IdempotencyKey must be a canonical UUIDv4 value.");
+        RuleFor(x => x)
+            .Must(command =>
+                (command.IdempotencyKey is null) ==
+                (command.ExpectedRowVersion is null))
+            .WithMessage("IdempotencyKey and ExpectedRowVersion must be supplied together.");
+    }
+
+    private static bool BeValidObservabilityMode(string? mode) =>
+        Enum.TryParse<ObservabilityMode>(mode, out var parsed) && Enum.IsDefined(parsed);
+
+    private static bool BeValidPurviewMode(string? mode) =>
+        Enum.TryParse<PurviewMode>(mode, out var parsed) && Enum.IsDefined(parsed);
+
+    private static bool HaveCompatibleObservabilitySettings(UpdateSystemConfigCommand command)
+    {
+        if (command.DefaultObservabilityMode is not null &&
+            !BeValidObservabilityMode(command.DefaultObservabilityMode))
+        {
+            return true;
+        }
+
+        return ObservabilityModeExtensions.TryResolve(
+            command.DefaultObservabilityMode,
+            command.DefaultAgent365ObservabilityEnabled,
+            command.DefaultAzureMonitorExportEnabled,
+            ObservabilityMode.Agent365,
+            out _);
+    }
+}

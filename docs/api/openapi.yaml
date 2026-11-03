@@ -1,0 +1,3737 @@
+openapi: '3.1.1'
+info:
+  title: A365 Gateway API
+  description: 'Connect independently hosted agents to Microsoft Entra, Agent 365, Purview and Prompt Shields. Administration uses an Entra access token; agent ingress uses a gateway-issued secret. Both use Authorization: Bearer, but are not interchangeable. Evaluate → call your model only on allow → submit the interaction. HTTP 202 means queued, never confirmed delivery. All timestamps are UTC. Interactive requests act on the live deployment.'
+  version: v1
+servers:
+  - url: http://127.0.0.1:5080/
+paths:
+  /api/v1/agent-activities:
+    post:
+      tags:
+        - Activities
+      summary: Submit an agent activity
+      description: "Queues sanitized activity telemetry. HTTP 202 means accepted, not delivered to Agent 365. Use a stable ActivityId and a UUID v4 Idempotency-Key for retries.\n\nAuthorization policy: ExternalAgentOnly."
+      operationId: Activities.SubmitActivity
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4. Reuse only for a retry of this exact request; use a new value for a new action.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitActivityRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/SubmitActivityRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/SubmitActivityRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ActivityReceiptDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityReceiptDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ActivityReceiptDto'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '413':
+          description: Payload Too Large
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - AgentKey: [ ]
+  /api/v1/agent-activities:batch:
+    post:
+      tags:
+        - Activities
+      summary: Submit an activity batch
+      description: "Queues a bounded batch of activities for the authenticated agent. Use a UUID v4 Idempotency-Key. Inspect the response for per-item acceptance.\n\nAuthorization policy: ExternalAgentOnly."
+      operationId: Activities.SubmitBatchActivities
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4. Reuse only for a retry of this exact request; use a new value for a new action.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchActivityRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/BatchActivityRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/BatchActivityRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/BatchActivityResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchActivityResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/BatchActivityResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '413':
+          description: Payload Too Large
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - AgentKey: [ ]
+  /api/v1/agent-identity-blueprints:
+    get:
+      tags:
+        - AgentIdentityBlueprints
+      summary: List available identity blueprints
+      description: "Lists blueprints eligible for registration. Each registration receives an individual agent identity; policies are assigned to that identity, not the shared blueprint.\n\nAuthorization policy: AdministratorOnly."
+      operationId: AgentIdentityBlueprints.ListAgentIdentityBlueprints
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentIdentityBlueprintListResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentIdentityBlueprintListResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentIdentityBlueprintListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '502':
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/purview-policies':
+    get:
+      tags:
+        - AgentPolicyAssignments
+      summary: Read individual-agent policy assignments
+      description: "Reports assignment states, binding freshness and observed allow/block timestamps. Assigned, synchronized and verified enforcement are distinct. A block does not identify which applicable policy caused it.\n\nAuthorization policy: AdministratorOnly."
+      operationId: AgentPolicyAssignments.List
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentPolicyAssignmentsResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPolicyAssignmentsResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentPolicyAssignmentsResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/purview-policies/review':
+    post:
+      tags:
+        - AgentPolicyAssignments
+      summary: Review an individual-agent assignment
+      description: "Binds a compatible policy revision, administrator and exact agent identity to a short-lived review. No policy write occurs until confirmation. Use policyId and revision from the current catalog.\n\nAuthorization policy: AdministratorOnly."
+      operationId: AgentPolicyAssignments.Review
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Selection'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/Selection'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/Selection'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentReviewResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentReviewResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentReviewResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/purview-policies/{operationId}/confirm':
+    post:
+      tags:
+        - AgentPolicyAssignments
+      summary: Confirm a reviewed policy assignment
+      description: "Queues the reviewed assignment for this individual identity. Preserves unrelated targets, exclusions, rules and mode. Returns 202 for new work or 200 for an already confirmed operation. Poll assignments for confirmation; requests fail closed while required protection is unavailable.\n\nAuthorization policy: AdministratorOnly."
+      operationId: AgentPolicyAssignments.Confirm
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAssignmentConfirmationResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /api/v1/agent-runtime/readiness:
+    get:
+      tags:
+        - AgentRuntime
+      summary: Check agent credential access
+      description: "Returns 204 when this agent credential passes authentication and admission. This is not proof of Purview enforcement or telemetry delivery.\n\nAuthorization policy: ExternalAgentOnly."
+      operationId: AgentRuntime.GetReadiness
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - AgentKey: [ ]
+  /api/v1/agents:
+    post:
+      tags:
+        - Agents
+      summary: Register an external agent
+      description: "Creates a registration and queues provisioning. Save the returned one-time credential securely. A 202 response is not Active. If the response is lost, reconcile using the exact externalAgentId instead of blindly creating another registration.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.RegisterAgent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgentRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgentRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgentRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/RegisterAgentResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterAgentResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/RegisterAgentResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Unprocessable Entity
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '502':
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+    get:
+      tags:
+        - Agents
+      summary: Search and paginate agents
+      description: "Follow nextCursor until absent. Search and pagination are server-side; do not interpret one page as the complete inventory.\n\nAuthorization policy: AllControlPlane."
+      operationId: Agents.ListAgents
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: environment
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            pattern: '^-?(?:0|[1-9]\d*)$'
+            type:
+              - integer
+              - string
+            format: int32
+            default: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentListResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentListResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentListResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}':
+    get:
+      tags:
+        - Agents
+      summary: Read an agent
+      description: "Returns registration state, protection configuration, provisioning references and rowVersion. Active registration does not itself establish protection readiness.\n\nAuthorization policy: AllControlPlane."
+      operationId: Agents.GetAgent
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentDetailDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetailDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetailDto'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+    delete:
+      tags:
+        - Agents
+      summary: Permanently deregister a registered agent
+      description: "Administrator only. Requires expectedRowVersion from a freshly reviewed agent and confirmPermanentDeletion=true. Blocks gateway use, deletes the exact identity-bound Agent 365 Registry record with delegated Graph access, verifies absence, then tombstones the gateway registration. Returns 200 only when complete. Unconfirmed deletions remain Deleting and can be retried after refreshing the row version. Entra identities, shared blueprints, Purview policies and audit history are retained. Active, Disabled and Deleting registrations only; unfinished provisioning must be resolved first.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.DeleteAgent
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRegisteredAgentRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRegisteredAgentRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/DeleteRegisteredAgentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DeleteAgentResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAgentResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAgentResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/credentials':
+    get:
+      tags:
+        - Agents
+      summary: List agent credential metadata
+      description: "Returns metadata only. Existing secret values cannot be retrieved.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.ListAgentIngressCredentials
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentIngressCredentialListResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentIngressCredentialListResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentIngressCredentialListResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+    post:
+      tags:
+        - Agents
+      summary: Issue an agent credential
+      description: "Returns a new secret once with no-store caching. Save it securely and do not automatically retry an uncertain issuance.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.IssueAgentIngressCredential
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/IssueAgentIngressCredentialResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueAgentIngressCredentialResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/IssueAgentIngressCredentialResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/credentials/{credentialId}':
+    delete:
+      tags:
+        - Agents
+      summary: Revoke an agent credential
+      description: "Revokes only the selected credential. The server enforces the last-usable-credential guard.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.RevokeAgentIngressCredential
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: credentialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/RevokeAgentIngressCredentialResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokeAgentIngressCredentialResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/RevokeAgentIngressCredentialResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/features':
+    patch:
+      tags:
+        - Agents
+      summary: Update agent features
+      description: "Protection changes require Idempotency-Key and If-Match headers matching idempotencyKey and expectedRowVersion in the reviewed body. Reload and review after a version conflict. This does not change the agent lifecycle.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.UpdateFeatures
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4 matching body idempotencyKey. Reuse it only to reconcile the same request.
+          required: true
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          description: Exact row version matching body expectedRowVersion. Read the latest resource before reviewing a new change.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFeaturesRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFeaturesRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateFeaturesRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/UpdateFeaturesResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateFeaturesResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/UpdateFeaturesResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}:enable':
+    post:
+      tags:
+        - Agents
+      summary: Enable an agent
+      description: "Changes gateway admission state for the selected registration.\n\nAuthorization policy: AdministratorOrOperator."
+      operationId: Agents.EnableAgent
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}:disable':
+    post:
+      tags:
+        - Agents
+      summary: Disable an agent
+      description: "Disables gateway admission for the selected registration.\n\nAuthorization policy: AdministratorOrOperator."
+      operationId: Agents.DisableAgent
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AgentStateChangeResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}:retry-provisioning':
+    post:
+      tags:
+        - Agents
+      summary: Retry eligible provisioning
+      description: "Retries only server-approved failed provisioning. Read the returned operation before deciding on another action.\n\nAuthorization policy: AdministratorOnly."
+      operationId: Agents.RetryProvisioning
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AsyncOperationResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncOperationResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AsyncOperationResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/audit-events':
+    get:
+      tags:
+        - Agents
+      summary: Read administrative audit events
+      description: "Returns the selected agent's administrative history, subject to caller authorization.\n\nAuthorization policy: AdministratorOrAuditor."
+      operationId: Agents.GetAuditEvents
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            pattern: '^-?(?:0|[1-9]\d*)$'
+            type:
+              - integer
+              - string
+            format: int32
+            default: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuditEventListResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/agents/{agentId}/provisioning-history':
+    get:
+      tags:
+        - Agents
+      summary: Read provisioning history
+      description: "Returns operation history used to find authoritative setup status and outstanding actions.\n\nAuthorization policy: AdministratorOrOperator."
+      operationId: Agents.GetProvisioningHistory
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProvisioningHistoryResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningHistoryResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningHistoryResponse'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check process liveness
+      description: 'Public liveness check. Does not establish worker health, policy enforcement or downstream delivery.'
+      operationId: Health.GetHealth
+      responses:
+        '200':
+          description: OK
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Check database readiness
+      description: Public database connectivity check. Returns 503 when unavailable; does not establish Microsoft service readiness.
+      operationId: Health.GetReadiness
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Service Unavailable
+  /api/v1/ai-interactions:
+    post:
+      tags:
+        - Interactions
+      summary: Submit a completed AI interaction
+      description: "Submit only after a successful prompt evaluation and model call. Supply the matching, unexpired evaluationReceiptId as promptEvaluationReceiptId. Agent, prompt, interaction, user and timestamp must match the evaluation. HTTP 202 is intake acceptance, not downstream delivery.\n\nAuthorization policy: ExternalAgentOnly."
+      operationId: Interactions.SubmitInteraction
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4. Reuse only for a retry of this exact request; use a new value for a new action.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitInteractionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/SubmitInteractionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/SubmitInteractionRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/InteractionReceiptDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InteractionReceiptDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/InteractionReceiptDto'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '413':
+          description: Payload Too Large
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - AgentKey: [ ]
+  '/api/v1/operations/{operationId}':
+    get:
+      tags:
+        - Operations
+      summary: Read asynchronous operation status
+      description: "Poll registration or Purview connector operations for authoritative stages, failure details and requested administrator actions. Do not infer completion from elapsed time.\n\nAuthorization policy: AdministratorOrOperator."
+      operationId: Operations.GetOperationStatus
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/OperationStatusDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatusDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatusDto'
+        '404':
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  '/api/v1/operations/{operationId}:complete-agent365-registration':
+    post:
+      tags:
+        - Operations
+      summary: Confirm Agent 365 Registry registration
+      description: "Requires a signed-in Gateway.Administrator with access_as_user and the API's delegated Graph Registry consent. Adds the existing agent to the Registry; it does not create another identity. Confirmation queues verification and is not an Active readback.\n\nAuthorization policy: DelegatedAdministratorRegistry."
+      operationId: Operations.CompleteAgent365Registration
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/CompleteAgent365RegistrationResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteAgent365RegistrationResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/CompleteAgent365RegistrationResponse'
+        '401':
+          description: Unauthorized
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /api/v1/prompts:evaluate:
+    post:
+      tags:
+        - PromptEvaluations
+      summary: Evaluate a prompt before calling a model
+      description: "Checks the agent's enabled Prompt Shields and Purview protections. Only allowed=true with a valid evaluationReceiptId authorizes the external model call. A blocked prompt returns 403; unavailable protection fails closed with 503. Never call the model on a failed or unknown result.\n\nAuthorization policy: ExternalAgentOnly."
+      operationId: PromptEvaluations.Evaluate
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4. Reuse only for a retry of this exact request; use a new value for a new action.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluatePromptRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/EvaluatePromptRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/EvaluatePromptRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PromptEvaluationResultDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptEvaluationResultDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PromptEvaluationResultDto'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - AgentKey: [ ]
+  /api/v1/protection/purview/connection:
+    get:
+      tags:
+        - PurviewConnection
+      summary: Read the local Purview connection state
+      description: "Reads durable connector, heartbeat and accepted-catalog status from the Gateway. Thirty seconds without an authenticated heartbeat reports degraded or disconnected local management readiness while retaining any accepted catalog. This endpoint never calls Purview or starts provider work.\n\nAuthorization policy: AdministratorOnly."
+      operationId: PurviewConnection.Get
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              description: Quoted current Purview connection row version. Send the response body's unquoted rowVersion value in If-Match for the next reviewed mutation.
+              required: true
+              schema:
+                type: string
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectionResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectionResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectionResponse'
+        '403':
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+    post:
+      tags:
+        - PurviewConnection
+      summary: Verify the installed Purview connector
+      description: "Accepts an asynchronous, operation-bound connection verification. Requires explicit confirmation, Idempotency-Key and the exact If-Match row version. HTTP 202 means queued, not connected.\n\nAuthorization policy: AdministratorOnly."
+      operationId: PurviewConnection.Connect
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4 for this exact connector operation. Reuse it only to reconcile the same request.
+          required: true
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          description: Exact rowVersion returned by GET /api/v1/protection/purview/connection; use * only for the first connection when no state exists.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectPurviewRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ConnectPurviewRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ConnectPurviewRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '412':
+          description: Precondition Failed
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /api/v1/protection/purview/connection/refresh:
+    post:
+      tags:
+        - PurviewConnection
+      summary: Refresh the Purview policy catalog
+      description: "Queues one authenticated catalog refresh through the installed connector. Requires Idempotency-Key and the exact If-Match row version. HTTP 202 is not proof of refresh success; poll the returned operation.\n\nAuthorization policy: AdministratorOnly."
+      operationId: PurviewConnection.Refresh
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4 for this exact connector operation. Reuse it only to reconcile the same request.
+          required: true
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          description: Exact rowVersion returned by GET /api/v1/protection/purview/connection; use * only for the first connection when no state exists.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshPurviewCatalogRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/RefreshPurviewCatalogRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/RefreshPurviewCatalogRequest'
+        required: true
+      responses:
+        '202':
+          description: Accepted
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PurviewConnectorOperationAcceptedResponse'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '409':
+          description: Conflict
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '412':
+          description: Precondition Failed
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /api/v1/protection/purview/policies:
+    get:
+      tags:
+        - PurviewPolicyCatalog
+      summary: Read existing Purview policies
+      description: "Returns the latest authenticated catalog accepted into authoritative Gateway persistence and compatibility reasons. Failure returns 503 instead of a fabricated empty catalog. Policy definitions and classifiers are managed in Purview.\n\nAuthorization policy: AdministratorOnly."
+      operationId: PurviewPolicyCatalog.List
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PurviewPolicyCatalogResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurviewPolicyCatalogResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/PurviewPolicyCatalogResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+  /api/v1/system/config:
+    get:
+      tags:
+        - System
+      summary: Read gateway settings
+      description: "Returns supported runtime defaults and their current rowVersion. Initial tenant connection setup belongs to bootstrap.\n\nAuthorization policy: AdministratorOnly."
+      operationId: System.GetSystemConfig
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+    patch:
+      tags:
+        - System
+      summary: Update gateway defaults
+      description: "Protection default changes require Idempotency-Key and If-Match headers matching the reviewed request body. Explicit per-agent protection choices remain unchanged.\n\nAuthorization policy: AdministratorOnly."
+      operationId: System.UpdateSystemConfig
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Canonical UUID v4 matching body idempotencyKey. Reuse it only to reconcile the same request.
+          required: true
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          description: Exact row version matching body expectedRowVersion. Read the latest resource before reviewing a new change.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemConfigRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemConfigRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemConfigRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfigDto'
+        '400':
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 'Missing, invalid or expired credential. Use the authentication scheme documented for this operation.'
+        '403':
+          description: 'Authenticated caller is not permitted, or protection blocked the request. Inspect the response errorCode and correlationId.'
+        '429':
+          description: Gateway rate limit exceeded. Respect Retry-After when supplied.
+      security:
+        - EntraBearer: [ ]
+components:
+  schemas:
+    ActivityReceiptDto:
+      required:
+        - receiptId
+        - activityId
+        - status
+        - receivedAtUtc
+        - correlationId
+      type: object
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        activityId:
+          type: string
+        status:
+          type: string
+        receivedAtUtc:
+          type: string
+          format: date-time
+        correlationId:
+          type:
+            - 'null'
+            - string
+    ActorDto:
+      required:
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        tenantUserObjectId:
+          type:
+            - 'null'
+            - string
+    Agent365InfoDto:
+      required:
+        - agentId
+        - blueprintId
+        - instanceId
+      type: object
+      properties:
+        agentId:
+          type:
+            - 'null'
+            - string
+        blueprintId:
+          type:
+            - 'null'
+            - string
+        instanceId:
+          type:
+            - 'null'
+            - string
+        agentIdentityObjectId:
+          type:
+            - 'null'
+            - string
+        blueprintObjectId:
+          type:
+            - 'null'
+            - string
+    AgentBlueprintSelectionDto:
+      required:
+        - mode
+        - blueprintObjectId
+        - displayName
+      type: object
+      properties:
+        mode:
+          type: string
+        blueprintObjectId:
+          type:
+            - 'null'
+            - string
+        displayName:
+          type:
+            - 'null'
+            - string
+    AgentDetailDto:
+      required:
+        - agentId
+        - externalAgentId
+        - name
+        - description
+        - status
+        - environment
+        - agent365
+        - features
+        - lastActivityAtUtc
+        - createdAtUtc
+        - updatedAtUtc
+        - ownerObjectId
+        - provisioning
+        - createdByObjectId
+        - updatedByObjectId
+        - rowVersion
+        - links
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        externalAgentId:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - 'null'
+            - string
+        status:
+          type: string
+        environment:
+          type: string
+        agent365:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Agent365InfoDto'
+        features:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentFeaturesDto'
+        lastActivityAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        createdAtUtc:
+          type: string
+          format: date-time
+        updatedAtUtc:
+          type: string
+          format: date-time
+        ownerObjectId:
+          type: string
+        provisioning:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ProvisioningStatusDto'
+        createdByObjectId:
+          type: string
+        updatedByObjectId:
+          type: string
+        rowVersion:
+          type: string
+          format: byte
+        links:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+        retryProvisioning:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ProvisioningRetryEligibilityDto'
+    AgentFeaturesDto:
+      required:
+        - observabilityMode
+        - purviewEnabled
+        - purviewMode
+      type: object
+      properties:
+        observabilityMode:
+          type:
+            - 'null'
+            - string
+        purviewEnabled:
+          type:
+            - 'null'
+            - boolean
+        purviewMode:
+          type:
+            - 'null'
+            - string
+        agent365ObservabilityEnabled:
+          type:
+            - 'null'
+            - boolean
+        azureMonitorExportEnabled:
+          type:
+            - 'null'
+            - boolean
+        promptShieldEnabled:
+          type:
+            - 'null'
+            - boolean
+        purviewEffectivelyEnabled:
+          type: boolean
+          default: false
+        promptShieldEffectivelyEnabled:
+          type: boolean
+          default: false
+        purviewPolicyMode:
+          type:
+            - 'null'
+            - string
+    AgentGatewayCredentialDto:
+      required:
+        - keyId
+        - apiKey
+        - expiresAtUtc
+      type: object
+      properties:
+        keyId:
+          type: string
+          format: uuid
+        apiKey:
+          type: string
+        expiresAtUtc:
+          type: string
+          format: date-time
+    AgentIdentityBlueprintListResponse:
+      required:
+        - items
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentIdentityBlueprintSummaryDto'
+    AgentIdentityBlueprintSummaryDto:
+      required:
+        - blueprintObjectId
+        - blueprintClientId
+        - displayName
+        - isAgent365Compatible
+        - agent365CompatibilityIssue
+      type: object
+      properties:
+        blueprintObjectId:
+          type: string
+          format: uuid
+        blueprintClientId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        isAgent365Compatible:
+          type: boolean
+        agent365CompatibilityIssue:
+          type:
+            - 'null'
+            - string
+    AgentIngressCredentialListResponse:
+      required:
+        - agentId
+        - items
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentIngressCredentialMetadataDto'
+    AgentIngressCredentialMetadataDto:
+      required:
+        - keyId
+        - createdAtUtc
+        - expiresAtUtc
+        - revokedAtUtc
+      type: object
+      properties:
+        keyId:
+          type: string
+          format: uuid
+        createdAtUtc:
+          type: string
+          format: date-time
+        expiresAtUtc:
+          type: string
+          format: date-time
+        revokedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+    AgentListResponse:
+      required:
+        - items
+        - nextCursor
+        - totalCount
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentSummaryDto'
+        nextCursor:
+          type:
+            - 'null'
+            - string
+        totalCount:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+    AgentPolicyAssignmentResponse:
+      required:
+        - operationId
+        - policyId
+        - policyName
+        - status
+        - failureCode
+        - confirmedAtUtc
+        - expiresAtUtc
+        - assignedAtUtc
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        policyId:
+          type: string
+          format: uuid
+        policyName:
+          type: string
+        status:
+          type: string
+        failureCode:
+          type:
+            - 'null'
+            - string
+        confirmedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        expiresAtUtc:
+          type: string
+          format: date-time
+        assignedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+    AgentPolicyAssignmentsResponse:
+      required:
+        - agentId
+        - agentIdentityId
+        - bindingCurrent
+        - allowObservedAtUtc
+        - blockObservedAtUtc
+        - items
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        agentIdentityId:
+          type:
+            - 'null'
+            - string
+        bindingCurrent:
+          type: boolean
+        allowObservedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        blockObservedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentPolicyAssignmentResponse'
+    AgentRegistrationDefaultsDto:
+      type: object
+      properties:
+        environment:
+          type: string
+          default: Production
+        reason:
+          type:
+            - 'null'
+            - string
+    AgentStateChangeResponse:
+      required:
+        - agentId
+        - status
+        - effectiveAtUtc
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        effectiveAtUtc:
+          type: string
+          format: date-time
+    AgentSummaryDto:
+      required:
+        - agentId
+        - externalAgentId
+        - name
+        - description
+        - status
+        - environment
+        - agent365
+        - features
+        - lastActivityAtUtc
+        - createdAtUtc
+        - updatedAtUtc
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        externalAgentId:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - 'null'
+            - string
+        status:
+          type: string
+        environment:
+          type: string
+        agent365:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Agent365InfoDto'
+        features:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentFeaturesDto'
+        lastActivityAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        createdAtUtc:
+          type: string
+          format: date-time
+        updatedAtUtc:
+          type: string
+          format: date-time
+    AsyncOperationResponse:
+      required:
+        - agentId
+        - status
+        - operationId
+        - links
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        status:
+          type:
+            - 'null'
+            - string
+        operationId:
+          type: string
+          format: uuid
+        links:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+    AuditEventDto:
+      required:
+        - eventId
+        - agentId
+        - eventType
+        - performedByObjectId
+        - occurredAtUtc
+        - details
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        performedByObjectId:
+          type:
+            - 'null'
+            - string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        details: { }
+    AuditEventListResponse:
+      required:
+        - items
+        - nextCursor
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEventDto'
+        nextCursor:
+          type:
+            - 'null'
+            - string
+    BatchActivityItemDto:
+      required:
+        - activityId
+        - sessionId
+        - activityType
+        - occurredAtUtc
+        - actor
+        - tool
+        - attributes
+      type: object
+      properties:
+        activityId:
+          type: string
+        sessionId:
+          type:
+            - 'null'
+            - string
+        activityType:
+          type: string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/ActorDto'
+        tool:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ToolDto'
+        attributes:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+    BatchActivityItemResult:
+      required:
+        - activityId
+        - status
+        - receiptId
+        - code
+        - detail
+      type: object
+      properties:
+        activityId:
+          type: string
+        status:
+          type: string
+        receiptId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        code:
+          type:
+            - 'null'
+            - string
+        detail:
+          type:
+            - 'null'
+            - string
+    BatchActivityRequest:
+      required:
+        - externalAgentId
+        - activities
+      type: object
+      properties:
+        externalAgentId:
+          type: string
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchActivityItemDto'
+    BatchActivityResponse:
+      required:
+        - accepted
+        - rejected
+        - items
+        - correlationId
+      type: object
+      properties:
+        accepted:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        rejected:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchActivityItemResult'
+        correlationId:
+          type:
+            - 'null'
+            - string
+    CompleteAgent365RegistrationResponse:
+      required:
+        - operationId
+        - agentId
+        - agent365RegistrationId
+        - status
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        agent365RegistrationId:
+          type: string
+        status:
+          type: string
+    ConnectPurviewRequest:
+      required:
+        - confirmConnection
+      type: object
+      properties:
+        confirmConnection:
+          type: boolean
+    ContentDto:
+      required:
+        - contentType
+        - content
+      type: object
+      properties:
+        contentType:
+          type: string
+        content:
+          type: string
+    DeleteAgentResponse:
+      required:
+        - agentId
+        - status
+        - operationId
+        - links
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        operationId:
+          type: string
+          format: uuid
+        links:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+    DeleteRegisteredAgentRequest:
+      required:
+        - expectedRowVersion
+        - confirmPermanentDeletion
+      type: object
+      properties:
+        expectedRowVersion:
+          type: string
+        confirmPermanentDeletion:
+          type: boolean
+    EvaluatePromptRequest:
+      required:
+        - externalAgentId
+        - interactionId
+        - occurredAtUtc
+        - userContext
+        - prompt
+      type: object
+      properties:
+        externalAgentId:
+          type: string
+        interactionId:
+          type: string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        userContext:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/UserContextDto'
+        prompt:
+          $ref: '#/components/schemas/ContentDto'
+    InteractionReceiptDto:
+      required:
+        - receiptId
+        - interactionId
+        - status
+        - purviewProcessing
+        - observabilityProcessing
+        - correlationId
+      type: object
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        interactionId:
+          type: string
+        status:
+          type: string
+        purviewProcessing:
+          type:
+            - 'null'
+            - string
+        observabilityProcessing:
+          type:
+            - 'null'
+            - string
+        correlationId:
+          type:
+            - 'null'
+            - string
+    IssueAgentIngressCredentialResponse:
+      required:
+        - agentId
+        - externalAgentId
+        - gatewayCredential
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        externalAgentId:
+          type: string
+        gatewayCredential:
+          $ref: '#/components/schemas/AgentGatewayCredentialDto'
+    ModelDto:
+      required:
+        - provider
+        - name
+      type: object
+      properties:
+        provider:
+          type:
+            - 'null'
+            - string
+        name:
+          type:
+            - 'null'
+            - string
+    OperationErrorDto:
+      required:
+        - code
+        - message
+      type: object
+      properties:
+        code:
+          type:
+            - 'null'
+            - string
+        message:
+          type:
+            - 'null'
+            - string
+    OperationStatusDto:
+      required:
+        - operationId
+        - type
+        - status
+        - currentStep
+        - percentComplete
+        - agentId
+        - startedAtUtc
+        - completedAtUtc
+        - error
+        - steps
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        status:
+          type: string
+        currentStep:
+          type:
+            - 'null'
+            - string
+        percentComplete:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        agentId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        startedAtUtc:
+          type: string
+          format: date-time
+        completedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        error:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/OperationErrorDto'
+        steps:
+          type:
+            - 'null'
+            - array
+          items:
+            $ref: '#/components/schemas/OperationStepDto'
+        workflowVersion:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+          default: 1
+        legacy:
+          type: boolean
+          default: true
+        replaySupported:
+          type: boolean
+          default: false
+        pollingRecommended:
+          type: boolean
+          default: false
+        requiredAction:
+          type:
+            - 'null'
+            - string
+        agent365RegistrationCompletionAvailable:
+          type: boolean
+          default: false
+        targetKind:
+          type:
+            - 'null'
+            - string
+        targetId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+    OperationStepDto:
+      required:
+        - step
+        - status
+        - completedAtUtc
+      type: object
+      properties:
+        step:
+          type: string
+        status:
+          type: string
+        completedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+    PolicyAssignmentConfirmationResponse:
+      required:
+        - operationId
+        - status
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+    PolicyAssignmentReviewResponse:
+      required:
+        - operationId
+        - agentId
+        - agentIdentityId
+        - policyId
+        - policyName
+        - expiresAtUtc
+        - effect
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        agentIdentityId:
+          type: string
+          format: uuid
+        policyId:
+          type: string
+          format: uuid
+        policyName:
+          type: string
+        expiresAtUtc:
+          type: string
+          format: date-time
+        effect:
+          type: string
+    PolicyCompatibilityResponse:
+      required:
+        - canAssign
+        - reason
+      type: object
+      properties:
+        canAssign:
+          type: boolean
+        reason:
+          type:
+            - 'null'
+            - string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+    PromptEvaluationResultDto:
+      required:
+        - evaluationId
+        - evaluationReceiptId
+        - interactionId
+        - allowed
+        - decision
+        - promptShieldProcessing
+        - purviewProcessing
+        - expiresAtUtc
+        - userMessage
+        - correlationId
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          format: uuid
+        evaluationReceiptId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        interactionId:
+          type: string
+        allowed:
+          type: boolean
+        decision:
+          type: string
+        promptShieldProcessing:
+          type: string
+        purviewProcessing:
+          type: string
+        expiresAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        userMessage:
+          type: string
+        correlationId:
+          type: string
+    ProvisioningHistoryResponse:
+      required:
+        - agentId
+        - jobs
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProvisioningJobDto'
+    ProvisioningJobDto:
+      required:
+        - operationId
+        - type
+        - status
+        - percentComplete
+        - startedAtUtc
+        - completedAtUtc
+        - error
+        - steps
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        status:
+          type: string
+        percentComplete:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        startedAtUtc:
+          type: string
+          format: date-time
+        completedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        error:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/OperationErrorDto'
+        steps:
+          type:
+            - 'null'
+            - array
+          items:
+            $ref: '#/components/schemas/OperationStepDto'
+    ProvisioningRetryEligibilityDto:
+      required:
+        - supported
+        - reason
+      type: object
+      properties:
+        supported:
+          type: boolean
+        reason:
+          type: string
+    ProvisioningStatusDto:
+      required:
+        - currentStep
+        - percentComplete
+        - lastError
+      type: object
+      properties:
+        currentStep:
+          type:
+            - 'null'
+            - string
+        percentComplete:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        lastError:
+          type:
+            - 'null'
+            - string
+        operationId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+    PurviewConnectionResponse:
+      required:
+        - tenantId
+        - connectorInstanceId
+        - state
+        - connectorProfile
+        - refreshMode
+        - lastHeartbeatAtUtc
+        - lastAttemptedRefreshAtUtc
+        - lastSuccessfulRefreshAtUtc
+        - catalogRetrievedAtUtc
+        - policyCount
+        - compatiblePolicyCount
+        - incompatiblePolicyCount
+        - catalogVerificationStatus
+        - currentOperationId
+        - lastFailureCode
+        - correlationId
+        - rowVersion
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        connectorInstanceId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        state:
+          type: string
+        connectorProfile:
+          type:
+            - 'null'
+            - string
+        refreshMode:
+          type: string
+        lastHeartbeatAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        lastAttemptedRefreshAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        lastSuccessfulRefreshAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        catalogRetrievedAtUtc:
+          type:
+            - 'null'
+            - string
+          format: date-time
+        policyCount:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        compatiblePolicyCount:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        incompatiblePolicyCount:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        catalogVerificationStatus:
+          type: string
+        currentOperationId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        lastFailureCode:
+          type:
+            - 'null'
+            - string
+        correlationId:
+          type:
+            - 'null'
+            - string
+        rowVersion:
+          type: string
+    PurviewConnectorOperationAcceptedResponse:
+      required:
+        - operationId
+        - status
+        - connectionState
+        - expiresAtUtc
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        connectionState:
+          type: string
+        expiresAtUtc:
+          type: string
+          format: date-time
+    PurviewPolicyCatalogResponse:
+      required:
+        - tenantId
+        - retrievedAtUtc
+        - source
+        - items
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        retrievedAtUtc:
+          type: string
+          format: date-time
+        source:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurviewPolicyResponse'
+    PurviewPolicyResponse:
+      required:
+        - id
+        - displayName
+        - mode
+        - enforcementPlanes
+        - individualApplicationIds
+        - revision
+        - compatibility
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        mode:
+          type: string
+        enforcementPlanes:
+          type: array
+          items:
+            type: string
+        individualApplicationIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        revision:
+          type: string
+        compatibility:
+          $ref: '#/components/schemas/PolicyCompatibilityResponse'
+    RefreshPurviewCatalogRequest:
+      type: object
+    RegisterAgentRequest:
+      required:
+        - externalAgentId
+        - name
+        - description
+        - ownerObjectId
+        - environment
+        - features
+      type: object
+      properties:
+        externalAgentId:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - 'null'
+            - string
+        ownerObjectId:
+          type: string
+        environment:
+          type: string
+        features:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentFeaturesDto'
+        blueprint:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentBlueprintSelectionDto'
+    RegisterAgentResponse:
+      required:
+        - agentId
+        - externalAgentId
+        - name
+        - status
+        - operationId
+        - createdAtUtc
+        - links
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        externalAgentId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        operationId:
+          type: string
+          format: uuid
+        createdAtUtc:
+          type: string
+          format: date-time
+        links:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+        gatewayCredential:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentGatewayCredentialDto'
+    RevokeAgentIngressCredentialResponse:
+      required:
+        - agentId
+        - credential
+        - alreadyRevoked
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        credential:
+          $ref: '#/components/schemas/AgentIngressCredentialMetadataDto'
+        alreadyRevoked:
+          type: boolean
+    Selection:
+      required:
+        - policyId
+        - revision
+      type: object
+      properties:
+        policyId:
+          type: string
+          format: uuid
+        revision:
+          type: string
+    SubmitActivityRequest:
+      required:
+        - externalAgentId
+        - activityId
+        - sessionId
+        - activityType
+        - occurredAtUtc
+        - actor
+        - tool
+        - attributes
+      type: object
+      properties:
+        externalAgentId:
+          type: string
+        activityId:
+          type: string
+        sessionId:
+          type:
+            - 'null'
+            - string
+        activityType:
+          type: string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/ActorDto'
+        tool:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ToolDto'
+        attributes:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+    SubmitInteractionRequest:
+      required:
+        - externalAgentId
+        - interactionId
+        - sessionId
+        - occurredAtUtc
+        - userContext
+        - prompt
+        - response
+        - model
+        - metadata
+      type: object
+      properties:
+        externalAgentId:
+          type: string
+        interactionId:
+          type: string
+        sessionId:
+          type:
+            - 'null'
+            - string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        userContext:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/UserContextDto'
+        prompt:
+          $ref: '#/components/schemas/ContentDto'
+        response:
+          $ref: '#/components/schemas/ContentDto'
+        model:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ModelDto'
+        metadata:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: string
+        promptEvaluationReceiptId:
+          type:
+            - 'null'
+            - string
+          format: uuid
+    SystemConfigDto:
+      required:
+        - provisioningMode
+        - defaultObservabilityMode
+        - retentionDaysIdempotencyRecords
+        - rateLimitPerClient
+        - rateLimitPerAgent
+        - rateLimitGlobal
+      type: object
+      properties:
+        provisioningMode:
+          type: string
+        defaultObservabilityMode:
+          type: string
+        retentionDaysIdempotencyRecords:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        rateLimitPerClient:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        rateLimitPerAgent:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        rateLimitGlobal:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - integer
+            - string
+          format: int32
+        defaultAgent365ObservabilityEnabled:
+          type:
+            - 'null'
+            - boolean
+        defaultAzureMonitorExportEnabled:
+          type:
+            - 'null'
+            - boolean
+        provisioningExecutionEnabled:
+          type: boolean
+          default: false
+        defaultPromptShieldEnabled:
+          type: boolean
+          default: false
+        promptShieldAvailable:
+          type: boolean
+          default: false
+        rowVersion:
+          type:
+            - 'null'
+            - string
+        registrationDefaults:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/AgentRegistrationDefaultsDto'
+    ToolDto:
+      required:
+        - name
+        - operation
+        - outcome
+        - durationMs
+      type: object
+      properties:
+        name:
+          type: string
+        operation:
+          type:
+            - 'null'
+            - string
+        outcome:
+          type: string
+        durationMs:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+    UpdateFeaturesRequest:
+      required:
+        - observabilityMode
+        - purviewEnabled
+        - purviewMode
+      type: object
+      properties:
+        observabilityMode:
+          type:
+            - 'null'
+            - string
+        purviewEnabled:
+          type:
+            - 'null'
+            - boolean
+        purviewMode:
+          type:
+            - 'null'
+            - string
+        agent365ObservabilityEnabled:
+          type:
+            - 'null'
+            - boolean
+        azureMonitorExportEnabled:
+          type:
+            - 'null'
+            - boolean
+        promptShieldEnabled:
+          type:
+            - 'null'
+            - boolean
+        idempotencyKey:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        expectedRowVersion:
+          type:
+            - 'null'
+            - string
+    UpdateFeaturesResponse:
+      required:
+        - agentId
+        - features
+        - updatedAtUtc
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        features:
+          $ref: '#/components/schemas/AgentFeaturesDto'
+        updatedAtUtc:
+          type: string
+          format: date-time
+    UpdateSystemConfigRequest:
+      required:
+        - defaultObservabilityMode
+        - retentionDaysIdempotencyRecords
+        - rateLimitPerClient
+        - rateLimitPerAgent
+        - rateLimitGlobal
+      type: object
+      properties:
+        defaultObservabilityMode:
+          type:
+            - 'null'
+            - string
+        retentionDaysIdempotencyRecords:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+        rateLimitPerClient:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+        rateLimitPerAgent:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+        rateLimitGlobal:
+          pattern: '^-?(?:0|[1-9]\d*)$'
+          type:
+            - 'null'
+            - integer
+            - string
+          format: int32
+        defaultAgent365ObservabilityEnabled:
+          type:
+            - 'null'
+            - boolean
+        defaultAzureMonitorExportEnabled:
+          type:
+            - 'null'
+            - boolean
+        defaultPromptShieldEnabled:
+          type:
+            - 'null'
+            - boolean
+        idempotencyKey:
+          type:
+            - 'null'
+            - string
+          format: uuid
+        expectedRowVersion:
+          type:
+            - 'null'
+            - string
+    UserContextDto:
+      required:
+        - tenantUserObjectId
+      type: object
+      properties:
+        tenantUserObjectId:
+          type:
+            - 'null'
+            - string
+  securitySchemes:
+    EntraBearer:
+      type: http
+      description: Entra access token for the Gateway API audience with the endpoint's required gateway role. Do not paste a gateway agent key here.
+      scheme: bearer
+      bearerFormat: JWT
+    AgentKey:
+      type: http
+      description: One-time gateway-issued agent key (a365gw_v1_...). Scoped to its registered agent. Do not use an Entra token for agent ingress.
+      scheme: bearer
+tags:
+  - name: Activities
+  - name: AgentIdentityBlueprints
+  - name: AgentPolicyAssignments
+  - name: AgentRuntime
+  - name: Agents
+  - name: Health
+  - name: Interactions
+  - name: Operations
+  - name: PromptEvaluations
+  - name: PurviewConnection
+  - name: PurviewPolicyCatalog
+  - name: System

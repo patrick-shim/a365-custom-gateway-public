@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- This executable resolves XML cryptography through the identity dependency. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
+    <ProjectReference Include="../../src/Gateway.Api/Gateway.Api.csproj" />
+    <ProjectReference Include="../../src/Gateway.Purview.CatalogHost/Gateway.Purview.CatalogHost.csproj" />
+  </ItemGroup>
+</Project>

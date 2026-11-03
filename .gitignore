@@ -1,0 +1,51 @@
+# Build output
+**/bin/
+**/obj/
+
+# Python samples
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/*.py[cod]
+**/*.egg-info/
+
+# Node / web app
+**/node_modules/
+web/console/dist/
+web/setup/dist/
+web/console/tsconfig.tsbuildinfo
+web/setup/tsconfig.tsbuildinfo
+**/coverage/
+**/TestResults/
+
+# Browser automation / screenshots
+.playwright*/
+/*.png
+
+# Bootstrap/deployment runtime state (ignored runtime area)
+.bootstrap/
+.agent-runtime/
+
+# IDE / tooling
+.vs/
+.vscode/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local secrets and runtime environment (never commit credentials)
+.env
+.env.*
+!.env.example
+!deploy/runtime/.env.example
+deploy/runtime/.env
+deploy/runtime/.env.local
+deploy/runtime/.env.runtime
+
+# Local wizard copy; keep only config.example.runtime.json in git
+bootstrap/config.runtime.json
+
+# Terminal/GUI-generated installation choices
+bootstrap/config.json

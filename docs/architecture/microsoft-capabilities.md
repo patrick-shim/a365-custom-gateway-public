@@ -1,0 +1,163 @@
+# Microsoft provider contracts
+
+Purview policy content remains owned by policy administrators. The Gateway
+discovers existing compatible policies and applies only reviewed individual-agent
+targets. See the [policy-consumption guide](purview-policy-consumption.md)
+for scope, revision, and enforcement guarantees.
+
+Contracts for the **essential Microsoft product services** this Gateway exists
+to use: **Entra, Graph, Agent 365, Purview, and Prompt Shields**.
+
+These product integrations are distinct from the tested local runtime, which uses
+PostgreSQL, RabbitMQ, an S3-compatible object store and Docker Compose. This
+repository does not contain Kubernetes or cloud-host deployment profiles.
+
+This guide describes the provider contracts used by the implementation. Tenant
+entitlements and permissions must be verified during deployment; source-level
+integration does not establish availability in every tenant. Product scope is
+defined in the [product brief](../spec/product-brief.md).
+
+## Agent Identity and Agent 365
+
+| Capability | Retained Gateway contract |
+|---|---|
+| Blueprint catalog | Graph v1.0 typed Agent Identity application casts and reviewed managerApplications |
+| Blueprint principal and federation | Graph v1.0 Agent Identity casts and application federated identity credentials, with exact readback |
+| Child Agent ID | POST /v1.0/servicePrincipals/microsoft.graph.agentIdentity; a distinct child for each registration |
+| Registry creation | POST /beta/copilot/agentRegistrations through user-only delegated OBO, at most once per operation lineage |
+| Observability | Direct S2S OTLP/HTTP JSON export with Agent365.Observability.OtelWrite |
+
+The worker Graph application-role allowlist is Application.Read.All,
+AppRoleAssignment.ReadWrite.All, AgentIdentityBlueprint.Create,
+AgentIdentityBlueprint.AddRemoveCreds.All,
+AgentIdentityBlueprintPrincipal.Create, AgentIdentityBlueprint.Read.All,
+AgentIdentity.Create.All and AgentIdentity.Read.All.
+
+Registry uses the API application's delegated AgentRegistration.Read.All and
+AgentRegistration.ReadWrite.All scopes. The Gateway requires a signed-in
+Administrator and does not delegate Registry creation to the worker.
+The source gates Registry beta to explicitly acknowledged development use;
+staging and production registration admission remain closed.
+
+The API persists a creator-bound planned Registry ID before its single POST and
+accepts the expected 201 response. An ambiguous result permits exact GET of that
+planned ID, never another create attempt. Local Gateway persistence does not
+replace Microsoft-side final verification.
+
+The exporter uses the direct route:
+
+```text
+POST https://agent365.svc.cloud.microsoft/observabilityService/tenants/{tenantId}/otlp/agents/{agentId}/traces?api-version=1
+```
+
+The route's agent ID is the child Agent Identity application ID. The app-only
+token must bind to that child and carry Agent365.Observability.OtelWrite.
+
+The accepted operation names are `invoke_agent`, `execute_tool`, `chat` and
+`output_messages`. The public activity contract also retains Custom, which does
+not have an Agent 365 export mapping. Optional OTLP result details and a `sent`
+sink indicate only the evidence reported by that endpoint; an absent or unrouted
+destination is not independently verified console landing.
+
+Provider references:
+[Agent 365 registration](https://learn.microsoft.com/microsoft-365/copilot/extensibility/api/admin-settings/agent-registration/agentregistration-create),
+[direct OpenTelemetry integration](https://learn.microsoft.com/microsoft-agent-365/developer/direct-open-telemetry-integration),
+[blueprint creation](https://learn.microsoft.com/graph/api/agentidentityblueprint-post?view=graph-rest-1.0),
+[child identity creation](https://learn.microsoft.com/graph/api/agentidentity-post?view=graph-rest-1.0),
+[Graph permissions](https://learn.microsoft.com/graph/permissions-reference),
+[OBO](https://learn.microsoft.com/entra/identity-platform/v2-oauth2-on-behalf-of-flow).
+
+## Purview runtime and policy administration
+
+| Capability | Current Gateway contract |
+|---|---|
+| Protection scopes | Graph v1.0 `/users/{userId}/dataSecurityAndGovernance/protectionScopes/compute`; child identity role `ProtectionScopes.Compute.User` |
+| Content processing | Graph v1.0 `/users/{userId}/dataSecurityAndGovernance/processContent`; child identity role `Content.Process.User` |
+| Content activity | Graph v1.0 `/users/{userId}/dataSecurityAndGovernance/activities/contentActivities` for upload/download activity submitted by the runtime client |
+| Policy catalog | Certificate-authenticated `Get-DlpCompliancePolicy` and `Get-DlpComplianceRule` through the Windows catalog host |
+| Policy assignment | `Set-DlpCompliancePolicy -Locations ...` with an exact individual-agent add, followed by policy and rule readback |
+
+The gateway does not create or edit sensitive information types, classifiers,
+rules, thresholds, actions, modes or exclusions. The standalone Purview diagnostic
+script may read sensitive-information-type inventory for troubleshooting, but
+that is not a product catalog or policy-authoring feature.
+
+Bootstrap establishes certificate-authenticated management access through the
+[runtime catalog host](purview-catalog-host.md). A logon-started listener performs
+catalog reads only for an accepted Connect or Manual sync operation and returns
+an authenticated, tenant-bound result. After validation, PostgreSQL is authoritative
+for the accepted catalog; the signed bootstrap file is only a one-time import
+source when database connector state is empty. The host also accepts authenticated
+assignment requests, preserves existing targets and exclusions, rejects conflicting
+scope, and verifies the policy and rule revision after its add operation.
+
+The Console reviews an existing compatible policy and binds confirmation to the
+exact child agent identity and reviewed revision. A successful management write
+does not prove runtime propagation or blocking. The gateway independently obtains
+the child's token, computes protection scope, and sends content to `processContent`
+before allowing the external model sequence. Missing or ambiguous required
+provider evidence fails closed.
+
+Provider references:
+[data-security APIs](https://learn.microsoft.com/purview/developer/use-the-api),
+[compute protection scopes](https://learn.microsoft.com/graph/api/userprotectionscopecontainer-compute?view=graph-rest-1.0),
+[process content](https://learn.microsoft.com/graph/api/userdatasecurityandgovernance-processcontent?view=graph-rest-1.0),
+[content activities](https://learn.microsoft.com/graph/api/activitiescontainer-post-contentactivities?view=graph-rest-1.0),
+[Get-DlpCompliancePolicy](https://learn.microsoft.com/powershell/module/exchangepowershell/get-dlpcompliancepolicy?view=exchange-ps),
+[Get-DlpComplianceRule](https://learn.microsoft.com/powershell/module/exchangepowershell/get-dlpcompliancerule?view=exchange-ps),
+[Set-DlpCompliancePolicy](https://learn.microsoft.com/powershell/module/exchangepowershell/set-dlpcompliancepolicy?view=exchange-ps),
+[module platform support](https://learn.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#supported-operating-systems-for-the-exchange-online-powershell-module).
+
+## Prompt Shields (essential product service)
+
+Prompt Shields is an **essential** Gateway capability. The adapter calls Microsoft
+content safety `POST /contentsafety/text:shieldPrompt` (API version 2024-09-01)
+as a **product API**, not as a reason to host the Gateway on Azure infrastructure.
+Authentication is explicitly configured as an API key or Entra client secret. These are product-service credentials, not an
+Azure hosting profile. The adapter does not silently switch authentication modes.
+An attack decision
+blocks; required protection fails closed on transport, authorization, or schema
+ambiguity.
+
+Per-agent On/Off is a usage control, not a statement that Prompt Shields is
+optional to the product. API reachability alone does not prove a successful
+runtime decision.
+
+Provider references (when using Azure AI Content Safety as the provider):
+[Prompt Shields operation](https://learn.microsoft.com/rest/api/contentsafety/text-operations/shield-prompt?view=rest-contentsafety-2024-09-01),
+[Entra authentication](https://learn.microsoft.com/azure/ai-services/authentication).
+
+## Current deployment boundaries
+
+| Area | Current implementation |
+|---|---|
+| Database | PostgreSQL |
+| Queues | RabbitMQ with duplicate-safe consumers |
+| Secrets | Ignored bootstrap files, generated Compose environment, and Windows certificate store |
+| Compute / images | Local Compose deployment and OCI images |
+| Purview management | Local Windows catalog host with certificate authentication |
+
+Azure hosting, executor-package deployment and Azure upgrade workflows are removed.
+Microsoft Graph, Registry and Purview operations use the exact Entra tenant bound
+by the accepted configuration regardless of where containers run.
+
+## Runtime credential notes
+
+| Concern | Runtime Compose |
+|---|---|
+| Worker → Graph | Workload client secret (`Agent365:ProvisioningClientSecret`) |
+| API → Registry OBO | API app client secret plus delegated user assertion |
+| Observability FMI proof | Blueprint client secret plus `fmi_path` |
+| Registry create | Delegated administrator only; never app-only |
+| Purview catalog and assignment | Dedicated management app and Windows certificate store |
+
+See [runtime guide](../runtime/README.md).
+
+## Unsupported assumptions
+
+The retained design does not assume ordinary applications can be converted into
+typed blueprints, **worker/app-only Registry creation**, replacing the **user**
+assertion in OBO with a client secret, an unvalidated REST replacement for
+compliance policy authoring, or write-only Purview APIs providing analytics
+retrieval. Provider readback, runtime certification and project milestone
+completion serve different purposes.

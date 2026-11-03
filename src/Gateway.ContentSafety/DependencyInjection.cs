@@ -1,0 +1,68 @@
+using Gateway.Domain.Interfaces;
+using Gateway.Application.Protection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Gateway.ContentSafety;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddPromptShieldServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<PromptShieldOptions>()
+            .Bind(configuration.GetSection(PromptShieldOptions.SectionName))
+            .ValidateOnStart();
+        // The options validator uses this binding's attestation check. Defer the
+        // actual options lookup until effective readiness, after validation.
+        services.AddSingleton<BootstrapPromptShieldRuntimeBinding>(serviceProvider =>
+            new BootstrapPromptShieldRuntimeBinding(() =>
+                serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>().Value));
+        services.AddSingleton<IBootstrapPromptShieldRuntimeBinding>(serviceProvider =>
+            serviceProvider.GetRequiredService<BootstrapPromptShieldRuntimeBinding>());
+        services.AddSingleton<IValidateOptions<PromptShieldOptions>, PromptShieldOptionsValidator>();
+        services.AddSingleton<IPromptShieldTokenProvider>(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>().Value;
+            if (!options.Enabled) return new DisabledPromptShieldTokenProvider();
+            if (options.UsesApiKey)
+            {
+                return new ApiKeyPromptShieldTokenProvider(
+                    serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>());
+            }
+
+            if (options.UsesClientSecret)
+            {
+                return new ClientSecretPromptShieldTokenProvider(
+                    serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>());
+            }
+
+            throw new InvalidOperationException("Unsupported Prompt Shields authentication mode.");
+        });
+        services.AddHttpClient(nameof(PromptShieldClient), (serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>().Value;
+            client.BaseAddress = string.IsNullOrWhiteSpace(options.Endpoint)
+                ? new Uri("https://localhost/")
+                : new Uri(options.Endpoint.EndsWith("/", StringComparison.Ordinal)
+                    ? options.Endpoint
+                    : options.Endpoint + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.RequestTimeoutSeconds);
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddSingleton<IPromptShieldClient>(serviceProvider =>
+            new PromptShieldClient(
+                serviceProvider.GetRequiredService<IHttpClientFactory>()
+                    .CreateClient(nameof(PromptShieldClient)),
+                serviceProvider.GetRequiredService<IPromptShieldTokenProvider>(),
+                serviceProvider.GetRequiredService<IOptions<PromptShieldOptions>>()));
+
+        return services;
+    }
+    private sealed class DisabledPromptShieldTokenProvider : IPromptShieldTokenProvider
+    {
+        public ValueTask<Azure.Core.AccessToken> GetTokenAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Prompt Shields is disabled.");
+    }
+}
