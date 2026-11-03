@@ -226,9 +226,9 @@ export const api = {
     return json(purviewConnectorOperationAcceptedSchema, "/api/v1/protection/purview/connection", "POST",
       { confirmConnection: true }, mutationHeaders(expectedRowVersion, idempotencyKey));
   },
-  refreshPurviewPolicies(expectedRowVersion: string, idempotencyKey = crypto.randomUUID()) {
+  refreshPurviewPolicies(expectedRowVersion: string, idempotencyKey = crypto.randomUUID(), policyId?: string) {
     return json(purviewConnectorOperationAcceptedSchema, "/api/v1/protection/purview/connection/refresh", "POST",
-      {}, mutationHeaders(expectedRowVersion, idempotencyKey));
+      policyId ? { policyId } : {}, mutationHeaders(expectedRowVersion, idempotencyKey));
   },
   async getPurviewConnectorOperation(operationId: string) {
     if (!operationIdSchema.safeParse(operationId).success) {

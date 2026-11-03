@@ -465,7 +465,7 @@ describe("Console routes with actual API envelopes", () => {
     renderApp("/settings/purview");
     expect(await screen.findByText("Your saved policy list is ready. Choose Manual sync when you want the latest policies from Purview.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Manual sync" })).toBeEnabled();
-    expect(screen.getByText("Policies stay saved locally until the next successful manual sync.")).toBeVisible();
+    expect(screen.getByText("The full catalog is reused for 72 hours. Each assignment checks its selected policy; Manual sync refreshes the full list anytime.")).toBeVisible();
     expect(server.requests.every(r => r.method === "GET")).toBe(true);
     expect(server.requests.filter(r => r.path === "/api/v1/protection/purview/connection")).toHaveLength(1);
   });
@@ -776,6 +776,7 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByText(`Agent identity: ${agent.agent365.agentId}`)).toBeVisible();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
+    expect(server.requests.find(x => x.path.endsWith("/connection/refresh"))?.body).toEqual({ policyId });
     await user.click(screen.getByRole("button", { name: "Assign policy" }));
     expect(await screen.findByText("Applying assignment")).toBeVisible();
     expect(screen.getByRole("progressbar", { name: "Applying assignment" })).toBeVisible();
@@ -907,9 +908,9 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByRole("button", { name: "Assign policy" })).toBeEnabled();
     const mutations = server.requests.filter(request => request.method === "POST");
-    expect(mutations).toHaveLength(2);
-    expect(mutations[1].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
-    expect(mutations[1].body).toEqual({ policyId, revision: "a".repeat(64) });
+    expect(mutations).toHaveLength(3);
+    expect(mutations[2].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
+    expect(mutations[2].body).toEqual({ policyId, revision: "a".repeat(64) });
   });
 
   it("clears an obsolete stale-catalog warning after a newer verified catalog is loaded", async () => {

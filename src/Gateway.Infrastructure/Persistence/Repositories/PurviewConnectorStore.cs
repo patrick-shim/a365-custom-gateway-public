@@ -145,6 +145,7 @@ internal sealed class PurviewConnectorStore(
             TenantId = submission.TenantId,
             ConnectorInstanceId = submission.ConnectorInstanceId,
             Type = submission.Type,
+            PolicyId = submission.PolicyId,
             Status = PurviewConnectorOperationStatus.Pending,
             CurrentStep = "Queued",
             PercentComplete = 0,

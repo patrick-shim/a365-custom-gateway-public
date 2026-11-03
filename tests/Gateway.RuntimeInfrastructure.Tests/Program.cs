@@ -109,6 +109,10 @@ try
     await using (var released = await new IdempotencyService(db).AcquireScopeAsync(scopeAgent, "features", "joined", default))
         await released.CompleteAsync(default);
     await CheckSchemaAsync(db);
+    // Upgrade an existing installation that predates targeted policy reads.
+    await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"PurviewConnectorOperations\" DROP COLUMN \"PolicyId\"");
+    await initializer.StartAsync(default);
+    await CheckSchemaAsync(db);
 
     // A connector submission can wait behind the dispatcher's tenant lock after
     // its serializable snapshot is established. A heartbeat-style row update in
@@ -163,7 +167,7 @@ try
             Guid.NewGuid().ToString("D"),
             Guid.NewGuid().ToString("D"),
             connectorNow,
-            connectorNow.AddMinutes(10));
+            connectorNow.AddMinutes(10), Guid.NewGuid());
         var repository = new PurviewConnectorStore(
             submitContext,
             NullLogger<PurviewConnectorStore>.Instance);
@@ -198,6 +202,8 @@ try
             "Purview submission did not recover from serialization contention.");
 
         await using var verify = Context();
+        Check((await verify.PurviewConnectorOperations.SingleAsync(item => item.Id == accepted.Operation.Id)).PolicyId == submission.PolicyId,
+            "The selected policy did not survive durable submission and reload.");
         Check(await verify.PurviewConnectorOperations.CountAsync(operation => operation.TenantId == connectorTenant) == 1,
             "Purview contention retry created duplicate operations.");
         Check(await verify.AuditEvents.CountAsync(audit =>

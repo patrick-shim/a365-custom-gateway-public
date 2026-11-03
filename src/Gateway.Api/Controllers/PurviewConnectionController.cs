@@ -58,12 +58,13 @@ public sealed class PurviewConnectionController(
     public Task<IActionResult> Refresh(
         [FromBody] RefreshPurviewCatalogRequest request,
         CancellationToken cancellationToken) =>
-        SubmitAsync(PurviewConnectorOperationType.RefreshCatalog, confirmConnection: false, cancellationToken);
+        SubmitAsync(PurviewConnectorOperationType.RefreshCatalog, confirmConnection: false, cancellationToken, request.PolicyId);
 
     private async Task<IActionResult> SubmitAsync(
         PurviewConnectorOperationType type,
         bool confirmConnection,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? policyId = null)
     {
         Response.Headers.CacheControl = "no-store";
         var actor = User.GetProtectionActor();
@@ -79,7 +80,7 @@ public sealed class PurviewConnectionController(
             rowVersion,
             actor.ObjectId,
             correlationId,
-            confirmConnection), cancellationToken);
+            confirmConnection, policyId), cancellationToken);
         return Accepted($"/api/v1/operations/{result.OperationId:D}", result);
     }
 

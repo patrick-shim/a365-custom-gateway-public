@@ -201,7 +201,7 @@ internal sealed class PurviewConnectorDispatcher(
                     pending.Status = PurviewConnectorOperationStatus.Running;
                     pending.CurrentStep = pending.Type == PurviewConnectorOperationType.Connect
                         ? "VerifyingConnection"
-                        : "RefreshingCatalog";
+                        : pending.PolicyId is not null ? "CheckingSelectedPolicy" : "RefreshingCatalog";
                     pending.PercentComplete = 20;
                     pending.IssuedAtUtc = CanonicalizeTransportTimestamp(now);
                     pending.StartedAtUtc ??= now;
@@ -709,6 +709,19 @@ internal sealed class PurviewConnectorDispatcher(
             throw new InvalidOperationException("Catalog generation is not monotonic.");
 
         PurviewPolicyCatalogValidation.Validate(catalog, operation.TenantId);
+        if (operation.PolicyId is { } policyId)
+        {
+            var previous = await db.PurviewCatalogSnapshots
+                .Where(snapshot => snapshot.TenantId == operation.TenantId &&
+                    snapshot.ConnectorInstanceId == operation.ConnectorInstanceId)
+                .OrderByDescending(snapshot => snapshot.Generation)
+                .FirstOrDefaultAsync(cancellationToken)
+                ?? throw new InvalidOperationException("A selected-policy check requires an accepted catalog.");
+            catalog = MergeSelectedPolicy(
+                AcceptedPurviewCatalog.Deserialize(previous, operation.TenantId, operation.ConnectorInstanceId),
+                catalog, policyId);
+            catalogHash = PurviewConnectorProtocol.Digest(catalog);
+        }
         var counts = CountPolicies(catalog);
         db.PurviewCatalogSnapshots.Add(CreateSnapshot(catalog, catalogHash, operation, counts, now));
         await ReconcileAssignmentsAsync(db, operation, catalog, now, cancellationToken);
@@ -725,7 +738,8 @@ internal sealed class PurviewConnectorDispatcher(
 
         state.State = PurviewConnectorState.Connected;
         state.CurrentOperationId = null;
-        state.LastSuccessfulRefreshAtUtc = now;
+        if (operation.PolicyId is null)
+            state.LastSuccessfulRefreshAtUtc = now;
         state.CatalogRetrievedAtUtc = catalog.RetrievedAtUtc.UtcDateTime;
         state.PolicyCount = counts.PolicyCount;
         state.CompatiblePolicyCount = counts.CompatibleCount;
@@ -740,13 +754,28 @@ internal sealed class PurviewConnectorDispatcher(
             Id = Guid.NewGuid(),
             EventType = operation.Type == PurviewConnectorOperationType.Connect
                 ? "PurviewConnectionVerified"
-                : "PurviewCatalogRefreshSucceeded",
+                : operation.PolicyId is not null ? "PurviewSelectedPolicyChecked" : "PurviewCatalogRefreshSucceeded",
             PerformedByObjectId = operation.RequestedByObjectId,
             PerformedByRole = "GatewayAdministrator",
             Details = $"OperationId={operation.Id:D}; ConnectorInstanceId={operation.ConnectorInstanceId:D}; Generation={operation.Generation}; CatalogHash={catalogHash}; PolicyCount={counts.PolicyCount}",
             CorrelationId = operation.CorrelationId,
             OccurredAtUtc = now
         });
+    }
+
+    internal static PurviewPolicyCatalog MergeSelectedPolicy(
+        PurviewPolicyCatalog previous, PurviewPolicyCatalog selected, Guid policyId)
+    {
+        PurviewPolicyCatalogValidation.Validate(previous, previous.TenantId);
+        PurviewPolicyCatalogValidation.Validate(selected, previous.TenantId);
+        if (policyId == Guid.Empty || selected.Items.Count != 1 || selected.Items[0].Id != policyId ||
+            !previous.Items.Any(policy => policy.Id == policyId))
+            throw new InvalidOperationException("The selected-policy result does not match the saved selection.");
+        // A targeted read updates one policy, never the full catalog's age or unrelated scope evidence.
+        return previous with
+        {
+            Items = previous.Items.Select(policy => policy.Id == policyId ? selected.Items[0] : policy).ToArray()
+        };
     }
 
     private static async Task ReconcileAssignmentsAsync(
@@ -758,7 +787,7 @@ internal sealed class PurviewConnectorDispatcher(
     {
         var confirmed = await db.AgentPolicyAssignments
             .Where(row => row.TenantId == operation.TenantId &&
-                row.ConfirmedAtUtc != null)
+                row.ConfirmedAtUtc != null && (operation.PolicyId == null || row.PolicyId == operation.PolicyId))
             .OrderBy(row => row.AgentRegistrationId)
             .ThenBy(row => row.PolicyId)
             .ThenByDescending(row => row.ConfirmedAtUtc)
@@ -1053,7 +1082,7 @@ internal sealed class PurviewConnectorDispatcher(
         operation.Generation,
         operation.RequestHash,
         CanonicalizeTransportTimestamp(operation.IssuedAtUtc),
-        CanonicalizeTransportTimestamp(operation.ExpiresAtUtc));
+        CanonicalizeTransportTimestamp(operation.ExpiresAtUtc), operation.PolicyId);
 
     internal static bool CommandMatchesOperation(
         PurviewConnectorCommand command,

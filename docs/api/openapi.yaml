@@ -3325,6 +3325,12 @@ components:
           $ref: '#/components/schemas/PolicyCompatibilityResponse'
     RefreshPurviewCatalogRequest:
       type: object
+      properties:
+        policyId:
+          type:
+            - 'null'
+            - string
+          format: uuid
     RegisterAgentRequest:
       required:
         - externalAgentId

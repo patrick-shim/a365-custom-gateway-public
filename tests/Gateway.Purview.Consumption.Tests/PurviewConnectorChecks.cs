@@ -359,6 +359,30 @@ static class PurviewConnectorChecks
             }
             catch (CryptographicException) { }
 
+            var selectedPolicyId = Guid.NewGuid();
+            var targetedCommand = command with
+            {
+                OperationId = Guid.NewGuid(), Generation = 100, PolicyId = selectedPolicyId,
+                IssuedAtUtc = now.AddSeconds(-1), ExpiresAtUtc = now.AddMinutes(5)
+            };
+            var publicationsBefore = compatibilityPublications;
+            await PurviewConnectorProtocol.WriteAtomicAsync(
+                Path.Combine(connectorDirectory, $"{targetedCommand.OperationId:D}.command.json"),
+                PurviewConnectorProtocol.Sign(targetedCommand, key, PurviewConnectorProtocol.CommandDomain), default);
+            Check(await listener.PollOnceAsync(default), "A selected-policy command was not consumed.");
+            var targetedResult = PurviewConnectorProtocol.Verify<PurviewConnectorResult>(
+                await File.ReadAllTextAsync(Path.Combine(connectorDirectory, $"{targetedCommand.OperationId:D}.result.json")),
+                key, PurviewConnectorProtocol.ResultDomain);
+            PurviewConnectorProtocol.ValidateResult(targetedResult, targetedCommand, tenantId, connectorId, now);
+            Check(targetedResult.Catalog?.Items.Single().Id == selectedPolicyId && compatibilityPublications == publicationsBefore,
+                "A targeted read did not bind the exact policy or overwrote the full compatibility catalog.");
+            try
+            {
+                PurviewConnectorProtocol.ValidateResult(targetedResult, targetedCommand with { PolicyId = Guid.NewGuid() }, tenantId, connectorId, now);
+                throw new Exception("A targeted result was accepted for another policy.");
+            }
+            catch (InvalidOperationException) { }
+
             Console.WriteLine("Purview connector idle, authenticated refresh, replay, deduplication, heartbeat, and assignment-isolation checks passed.");
         }
         finally
@@ -375,7 +399,8 @@ static class PurviewConnectorChecks
 
         public Task<PurviewPolicyCatalog> ReadCatalogAsync(
             PurviewConnectorAction action,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? policyId = null)
         {
             CatalogReads++;
             AfterCatalogRead?.Invoke();
@@ -384,7 +409,7 @@ static class PurviewConnectorChecks
                 tenantId,
                 DateTimeOffset.UtcNow,
                 [new PurviewExistingPolicy(
-                    Guid.NewGuid(),
+                    policyId ?? Guid.NewGuid(),
                     "Existing policy",
                     "Enable",
                     ["Application"],

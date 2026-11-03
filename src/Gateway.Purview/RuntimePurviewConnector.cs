@@ -28,7 +28,8 @@ public sealed record PurviewConnectorCommand(
     long Generation,
     string RequestHash,
     DateTime IssuedAtUtc,
-    DateTime ExpiresAtUtc);
+    DateTime ExpiresAtUtc,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? PolicyId = null);
 
 public sealed record PurviewConnectorResult(
     Guid OperationId,
@@ -131,6 +132,8 @@ public static class PurviewConnectorProtocol
         utcNow = RequireUtc(utcNow, nameof(utcNow));
         var issued = RequireUtc(command.IssuedAtUtc, nameof(command.IssuedAtUtc));
         var expires = RequireUtc(command.ExpiresAtUtc, nameof(command.ExpiresAtUtc));
+        if (command.PolicyId == Guid.Empty || (command.PolicyId is not null && command.Action != PurviewConnectorAction.RefreshCatalog))
+            throw new InvalidOperationException("Invalid selected-policy command.");
         if (tenantId == Guid.Empty || connectorInstanceId == Guid.Empty || command.OperationId == Guid.Empty ||
             command.TenantId != tenantId || command.ConnectorInstanceId != connectorInstanceId ||
             !Enum.IsDefined(command.Action) || command.Generation <= 0 || !IsDigest(command.RequestHash) ||
@@ -162,6 +165,9 @@ public static class PurviewConnectorProtocol
                 result.CatalogHash != Digest(result.Catalog) || result.FailureCode is not null)
                 throw new InvalidOperationException("Successful Purview connector result is incomplete.");
             PurviewPolicyCatalogValidation.Validate(result.Catalog, tenantId);
+            if (command.PolicyId is { } policyId &&
+                (result.Catalog.Items.Count != 1 || result.Catalog.Items[0].Id != policyId))
+                throw new InvalidOperationException("Selected-policy result does not match the command.");
             var completedOffset = new DateTimeOffset(completed);
             if (result.Catalog.RetrievedAtUtc < completedOffset.Subtract(PurviewPolicyCatalogValidation.MaximumConnectorResultAge) ||
                 result.Catalog.RetrievedAtUtc > completedOffset.AddMinutes(1))

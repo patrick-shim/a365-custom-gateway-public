@@ -104,9 +104,11 @@ catalog state changes; connector status records the failed operation separately.
 A failed refresh preserves the last accepted snapshot. Connection state becomes
 `Degraded` when that snapshot exists or `Disconnected` when none exists. Catalog
 age is shown to administrators without expiring selection, review, or confirmation.
-The cached catalog stays usable until successful manual sync replaces it. The
-host still verifies the selected policy live before assignment. Indefinite
-accepted-snapshot reuse is separate from the connector protocol:
+The cached catalog remains available during refresh failures. Assignment review
+refreshes the full catalog after 72 hours and checks the selected policy on every
+review; Manual sync remains available at any time. The host also verifies the
+selected policy live before assignment. Snapshot retention is separate from the
+connector protocol:
 a newly completed provider operation must return catalog evidence retrieved within
 fifteen minutes of its completion and bound to that exact command.
 
@@ -155,3 +157,18 @@ separate, explicitly gated live checks.
 
 The [manual-refresh record](../spec/purview-connector-vnext.md) contains the full
 state, migration, and test matrix.
+
+## Selected-policy refresh and catalog reuse
+
+Assignment review reuses the verified full catalog for 72 hours and requests a
+targeted read for the exact selected policy. Manual sync still reads the full
+catalog. The optional `policyId` is stored with the durable connector operation,
+included in its request hash and signed command, and checked against the signed
+result. A targeted success contains exactly that policy. Missing or unavailable
+policies fail the read; they cannot be replaced with an empty successful snapshot.
+The dispatcher merges only the authenticated selected policy into a new accepted
+snapshot, retaining the prior full-catalog retrieval time. It reconciles only
+assignments for that policy. Unrelated cached policies and assignments remain
+unchanged. A failed read preserves the previous snapshot. Assignment review and
+confirmation continue binding the public revision; the host rechecks the exact
+policy immediately before mutation. No timer performs unattended provider reads.

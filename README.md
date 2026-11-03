@@ -31,11 +31,12 @@ data.
 > development-gated preview. Production hosting requires deployment-specific TLS,
 > durable secret management, infrastructure hardening, and service supervision.
 
-Before preparing an assignment review, the Console requests a Purview catalog refresh
-and waits for its authenticated result. The review uses the refreshed policy revision,
-so adding another agent does not reuse the revision from before the previous assignment.
-Cached policies remain selectable during outages; an explicit saved-policy review is
-available after a refresh failure, with live revision checks still required before writing.
+The Console reuses the verified policy catalog for 72 hours. Review assignment
+refreshes the full catalog only when that window has elapsed, then checks just
+the selected policy live before preparing confirmation. Manual sync remains
+available at any time. Selected-policy checks do not reset the full catalog's
+age. Assignment still checks the reviewed revision and exact individual target
+immediately before writing. See [the specification](SPEC.md#beta-protection-setup).
 
 Purview assignment and inline activation are separate. After a new target is
 assigned, Microsoft may still return only offline processing while distributing

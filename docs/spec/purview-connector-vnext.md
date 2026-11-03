@@ -274,3 +274,11 @@ path, platform secret provider, durable remote transport, supervised connector
 deployment, instance replacement, upgrade/rollback, and restart evidence. The local
 implementation must not be described as Linux, container, or cloud-managed Purview
 catalog support.
+
+## Selected-policy refresh and catalog reuse
+
+Assignment review reuses the full catalog for 72 hours, then refreshes it on demand.
+Every review checks the selected policy live; Manual sync remains available.
+The durable operation stores an optional `PolicyId` and binds it in the request
+hash and signed command. A targeted read preserves the full-catalog retrieval
+time and unrelated policy evidence. See the [catalog host protocol](../architecture/purview-catalog-host.md#selected-policy-refresh-and-catalog-reuse).

@@ -20,33 +20,53 @@ function pause(signal: AbortSignal) {
   });
 }
 
-// Refresh only in response to Review assignment. Polling never submits another
-// operation, and cancelling the view cannot cancel an already accepted read.
-export async function refreshAssignmentCatalog(signal: AbortSignal) {
+// Reads start only from Review assignment. Cancelling the view stops polling,
+// while an accepted connector operation continues durably on the server.
+export async function refreshAssignmentCatalog(policyId: string, signal: AbortSignal) {
   const deadline = Date.now() + 7 * 60_000;
-  const connection = await api.getPurviewConnection();
-  cancelled(signal);
-  let operationId = ["Connecting", "Refreshing"].includes(connection.state)
-    ? connection.currentOperationId
-    : null;
-  if (!operationId) {
-    const accepted = await api.refreshPurviewPolicies(connection.rowVersion);
-    operationId = accepted.operationId;
-  }
-  while (Date.now() < deadline) {
-    cancelled(signal);
-    const operation = await api.getPurviewConnectorOperation(operationId);
-    cancelled(signal);
-    if (operation.status === "Succeeded") {
-      const catalog = await api.listPurviewPolicies();
+  const wait = async (operationId: string) => {
+    while (Date.now() < deadline) {
       cancelled(signal);
-      if (Date.parse(catalog.retrievedAtUtc) < Date.parse(operation.startedAtUtc))
-        throw new ApiError("The refreshed policy catalog is not available yet. Review again after sync completes.", 409);
-      return catalog;
+      const operation = await api.getPurviewConnectorOperation(operationId);
+      cancelled(signal);
+      if (operation.status === "Succeeded") return operation;
+      if (!["Pending", "Running"].includes(operation.status))
+        throw new ApiError("Purview policy check did not complete. No assignment was submitted. Check the Purview connection, or explicitly review the saved policy.", 503);
+      await pause(signal);
     }
-    if (!["Pending", "Running"].includes(operation.status))
-      throw new ApiError("Purview policy refresh did not complete. No assignment was submitted. Check the Purview connection, or explicitly review the saved policy.", 503);
-    await pause(signal);
+    throw new ApiError("Policy check is taking longer than expected. No assignment was submitted. The accepted operation continues in the background; check Manual sync for its status.", 504);
+  };
+  const idleConnection = async () => {
+    let connection = await api.getPurviewConnection();
+    cancelled(signal);
+    while (connection.currentOperationId && ["Connecting", "Refreshing"].includes(connection.state)) {
+      await wait(connection.currentOperationId);
+      connection = await api.getPurviewConnection();
+      cancelled(signal);
+      if (connection.currentOperationId && ["Connecting", "Refreshing"].includes(connection.state))
+        await pause(signal);
+    }
+    return connection;
+  };
+  let connection = await idleConnection();
+  let catalog = await api.listPurviewPolicies();
+  cancelled(signal);
+  const age = Date.now() - Date.parse(catalog.retrievedAtUtc);
+  if (!Number.isFinite(age) || age < 0 || age >= 72 * 60 * 60_000) {
+    const accepted = await api.refreshPurviewPolicies(connection.rowVersion);
+    const completed = await wait(accepted.operationId);
+    catalog = await api.listPurviewPolicies();
+    cancelled(signal);
+    if (!Number.isFinite(Date.parse(catalog.retrievedAtUtc)) ||
+        Date.parse(catalog.retrievedAtUtc) < Date.parse(completed.startedAtUtc))
+      throw new ApiError("The refreshed policy catalog is not available yet. Review again after sync completes.", 409);
+    connection = await idleConnection();
   }
-  throw new ApiError("Policy refresh is taking longer than expected. No assignment was submitted. The accepted refresh continues in the background; check Manual sync for its status.", 504);
+  if (!catalog.items.some(policy => policy.id === policyId))
+    throw new ApiError("The selected policy is no longer in the catalog. Select another policy.", 409);
+  const accepted = await api.refreshPurviewPolicies(connection.rowVersion, crypto.randomUUID(), policyId);
+  await wait(accepted.operationId);
+  catalog = await api.listPurviewPolicies();
+  cancelled(signal);
+  return catalog;
 }

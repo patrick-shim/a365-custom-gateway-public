@@ -62,14 +62,15 @@ form. A later request recomputes offline-only scopes instead of caching them.
 
 ## Assignment review freshness
 
-Review assignment requests a catalog refresh, shows bounded progress, and prepares
-the exact selected policy from the authenticated accepted result. It reuses an
-already active connector read instead of submitting overlapping refreshes. No
-assignment is confirmed automatically. If refresh fails or polling times out, the
-Console stops progress and offers Review saved policy with an explicit warning;
-provider-side revision checks still reject stale writes. Successful refresh clears
-obsolete reviews without clearing the selected policy while its new review is being
-prepared. Navigating away stops local polling and cannot trigger a later review.
+Review assignment reuses the full catalog while it is less than 72 hours old.
+At the boundary it requests a full refresh. It then checks only the selected
+policy and prepares confirmation from that policy's updated public revision.
+The progress label says Checking selected policy. A concurrent connector read is
+allowed to complete before another is submitted; polling does not create reads.
+The catalog caption explains the 72-hour reuse period and selected-policy check.
+Manual sync remains an explicit full refresh at any age. Failed refreshes retain
+the saved catalog and offer an explicit saved-policy review; live write checks
+remain mandatory. Navigation stops local waiting, not an accepted server operation.
 
 ## Purview connection and Manual sync
 

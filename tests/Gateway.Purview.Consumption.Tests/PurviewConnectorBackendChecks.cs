@@ -344,7 +344,7 @@ static class PurviewConnectorBackendChecks
         var handler = new SubmitPurviewConnectorOperationHandler(store, TimeProvider.System);
         var key = Guid.NewGuid();
         while (key.Version != 4) key = Guid.NewGuid();
-        var response = await handler.Handle(new SubmitPurviewConnectorOperation(
+        var submission = new SubmitPurviewConnectorOperation(
             tenantId,
             connectorId,
             "LocalWindows",
@@ -352,9 +352,25 @@ static class PurviewConnectorBackendChecks
             key.ToString("D"),
             Convert.ToBase64String(state.RowVersion),
             Guid.NewGuid().ToString("D"),
-            Guid.NewGuid().ToString("D")), default);
+            Guid.NewGuid().ToString("D"));
+        var response = await handler.Handle(submission, default);
         Check(response.OperationId == operation.Id && store.Submissions == 1,
             "A valid manual refresh was not submitted through the durable connector store.");
+
+        var fullHash = store.LastSubmission!.RequestHash;
+        var selectedId = Guid.NewGuid();
+        await handler.Handle(submission with { PolicyId = selectedId }, default);
+        var selectedHash = store.LastSubmission!.RequestHash;
+        Check(store.LastSubmission.PolicyId == selectedId && selectedHash != fullHash,
+            "Selected-policy scope was not persisted or bound to idempotency.");
+        await handler.Handle(submission with { PolicyId = Guid.NewGuid() }, default);
+        Check(store.LastSubmission!.RequestHash != selectedHash, "Different policies shared an idempotency request hash.");
+        await handler.Handle(submission, default);
+        Check(store.LastSubmission!.RequestHash == fullHash, "Legacy full-refresh request hash changed.");
+        persistedOperation.PolicyId = selectedId;
+        Check(PurviewConnectorDispatcher.CreateCommand(persistedOperation).PolicyId == selectedId &&
+            !PurviewConnectorDispatcher.CommandMatchesOperation(legacyPrePersistenceCommand, persistedOperation),
+            "Recovered targeted operation lost its exact policy binding.");
 
         var missing = await new GetPurviewConnectionHandler(new EmptyStore()).Handle(
             new GetPurviewConnectionQuery(tenantId, connectorId, "LocalWindows"), default);
@@ -376,6 +392,7 @@ static class PurviewConnectorBackendChecks
         PurviewConnectorOperation operation) : IPurviewConnectorStore
     {
         public int Submissions { get; private set; }
+        public PurviewConnectorSubmission? LastSubmission { get; private set; }
         public Task<PurviewConnectorStateRecord?> GetStateAsync(Guid tenantId, CancellationToken ct) =>
             Task.FromResult<PurviewConnectorStateRecord?>(state);
         public Task<PurviewConnectorOperation?> GetOperationAsync(Guid operationId, CancellationToken ct) =>
@@ -385,6 +402,7 @@ static class PurviewConnectorBackendChecks
         public Task<PurviewConnectorSubmissionResult> SubmitAsync(PurviewConnectorSubmission submission, CancellationToken ct)
         {
             Submissions++;
+            LastSubmission = submission;
             return Task.FromResult(new PurviewConnectorSubmissionResult(state, operation, false));
         }
     }

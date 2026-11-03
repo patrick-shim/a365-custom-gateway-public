@@ -3,7 +3,8 @@ param([Parameter(Mandatory)][guid]$TenantId,
       [Parameter(Mandatory)][string]$Organization,
       [Parameter(Mandatory)][string]$CertificateThumbprint,
       [Parameter(Mandatory)][ValidateSet('VerifyConnection','RefreshCatalog','ApplyAssignment')][string]$Operation,
-      [string]$AssignmentRequestPath)
+      [string]$AssignmentRequestPath,
+      [Nullable[guid]]$PolicyId)
 $ErrorActionPreference = 'Stop'
 $WarningPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
@@ -23,7 +24,13 @@ try {
     $assignment = $null
     if ($Operation -in @('VerifyConnection','RefreshCatalog')) {
         if ($AssignmentRequestPath) { throw 'Assignment request is not valid for a catalog read.' }
-        $catalog = Read-PurviewPolicyCatalog -TenantId $TenantId
+        if ($null -ne $PolicyId) {
+            if ($Operation -ne "RefreshCatalog" -or $PolicyId -eq [guid]::Empty) { throw "Invalid selected policy." }
+            $catalog = Read-PurviewPolicyCatalog -TenantId $TenantId -PolicyId $PolicyId
+            if (@($catalog.items).Count -ne 1 -or [guid]$catalog.items[0].id -ne $PolicyId) { throw "Selected policy not found." }
+        } else {
+            $catalog = Read-PurviewPolicyCatalog -TenantId $TenantId
+        }
     }
     elseif ($Operation -eq 'ApplyAssignment') {
         if ([string]::IsNullOrWhiteSpace($AssignmentRequestPath)) { throw 'Assignment request is required.' }

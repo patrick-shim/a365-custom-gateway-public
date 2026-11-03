@@ -113,6 +113,22 @@ var agedInventory = snapshot with
     RetrievedAtUtc = DateTimeOffset.UtcNow.AddYears(-1)
 };
 PurviewPolicyCatalogValidation.Validate(agedInventory, tenant);
+var unrelated = good with { Id = Guid.NewGuid(), DisplayName = "Unrelated policy" };
+var baseline = agedInventory with { Items = [good, unrelated] };
+var changed = good with { Revision = new string('b', 64) };
+var selectedRead = snapshot with { Items = [changed] };
+var merged = PurviewConnectorDispatcher.MergeSelectedPolicy(baseline, selectedRead, good.Id);
+Check(merged.RetrievedAtUtc == baseline.RetrievedAtUtc && merged.Items[0] == changed &&
+    ReferenceEquals(merged.Items[1], unrelated), "Selected-policy merge reset full-catalog age or changed unrelated evidence.");
+foreach (var invalidSelection in new[] { selectedRead with { Items = [] },
+    selectedRead with { Items = [unrelated] }, selectedRead with { Items = [changed, unrelated] },
+    selectedRead with { TenantId = Guid.NewGuid() } })
+{
+    var rejected = false;
+    try { PurviewConnectorDispatcher.MergeSelectedPolicy(baseline, invalidSelection, good.Id); }
+    catch (Exception failure) when (failure is InvalidOperationException or PurviewPolicyException) { rejected = true; }
+    Check(rejected, "A mismatched targeted result replaced saved catalog evidence.");
+}
 var connectorInstanceId = Guid.NewGuid();
 var cachedSnapshot = new PurviewCatalogSnapshot
 {

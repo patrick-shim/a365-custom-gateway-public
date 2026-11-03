@@ -287,3 +287,15 @@ assigned, Microsoft may still return only offline processing while distributing
 the policy. Required prompt DLP rejects that state with `PURVIEW_INLINE_SCOPE_NOT_READY`
 (HTTP 503), issues no allow receipt, and does not permit a model call. Clients must distinguish this temporary readiness result from an allow or block.
 Content submissions are not automatically retried. A later request recomputes offline-only scopes instead of caching them.
+
+### Targeted policy refresh
+
+`POST /api/v1/protection/purview/connection/refresh` accepts `{}` for full Manual
+sync, or `{ "policyId": "<selected-policy-guid>" }` for a selected-policy check.
+Both require the existing administrator authorization, exact `If-Match`, and
+UUID-v4 `Idempotency-Key`; the policy ID participates in request identity. A `202`
+means queued, not checked or assigned. Poll the returned operation to completion.
+A targeted read must return exactly the selected policy. Success updates only
+that policy in the accepted catalog and retains the full catalog's retrieval time.
+The Console reuses full catalogs for 72 hours, then refreshes them on review;
+Manual sync is always available. Review and confirmation contracts are unchanged.

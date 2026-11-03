@@ -33,11 +33,12 @@ The local implementation has offline regression coverage. Passing those checks
 does not establish live tenant enforcement, Windows restart recovery, Docker
 restart recovery, or downstream Microsoft-service visibility.
 
-Assignment review refreshes the catalog as part of the explicit Review assignment
-action. Regression coverage must prove that a second agent uses the revision after
-the first assignment, that refresh failures cannot silently submit an old revision,
-and that saved-policy review remains explicitly available during outages. This is
-a correction to the current local workflow, not a deferred server/cloud milestone.
+The current local release reuses a verified full catalog for 72 hours and checks
+only the selected policy before every assignment review. Release gates cover the
+72-hour boundary, retained full-sync age, targeted-result binding and preservation
+of unrelated policies/assignments, failed reads, and live write concurrency.
+Manual sync remains available. This is a current local workflow change; the
+server/cloud milestone remains deferred. See [SPEC.md](SPEC.md#beta-protection-setup).
 
 Purview assignment and inline activation are separate. After a new target is
 assigned, Microsoft may still return only offline processing while distributing

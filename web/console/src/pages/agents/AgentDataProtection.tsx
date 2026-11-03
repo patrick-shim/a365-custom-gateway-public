@@ -122,7 +122,7 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
     setErrorPhase("review");
     let refreshed = saved;
     try {
-      const latest = saved ? catalog.data! : await refreshAssignmentCatalog(controller.signal);
+      const latest = saved ? catalog.data! : await refreshAssignmentCatalog(policy.id, controller.signal);
       if (controller.signal.aborted) return;
       refreshed = true;
       // Preserve the exact selection across the refresh; never substitute another policy.
@@ -189,7 +189,7 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
         {catalog.data && (
           <Caption1>
             Last synced {new Date(catalog.data.retrievedAtUtc).toLocaleString()}. Saved policies
-            stay available until the next successful sync. Review assignment refreshes them before approval.
+            are reused for 72 hours. Review assignment checks the selected policy before approval; Manual sync refreshes the full list anytime.
           </Caption1>
         )}
         {catalog.isPending && <Spinner size="small" label="Loading saved policies" />}
@@ -255,7 +255,7 @@ export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
           icon={action === "review" ? <Spinner size="tiny" /> : undefined}
           onClick={() => void prepare(false)}
         >
-          {action === "review" ? "Refreshing policy for review…" : "Review assignment"}
+          {action === "review" ? "Checking selected policy…" : "Review assignment"}
         </Button>
         {refreshFailed && !review && (
           <>

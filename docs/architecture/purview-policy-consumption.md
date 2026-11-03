@@ -210,3 +210,11 @@ operator action after assignment. Test Agent remains available separately.
 Runtime scope checks, receipt binding and fail-closed evaluation remain unchanged;
 provider-specific enforcement and sibling isolation are independent validation
 concerns, not mandatory Console setup steps.
+
+## Selected-policy refresh and catalog reuse
+
+Assignment review reuses the full catalog for 72 hours, then refreshes it on demand.
+Every review checks the selected policy live; Manual sync remains available.
+The durable operation stores an optional `PolicyId` and binds it in the request
+hash and signed command. A targeted read preserves the full-catalog retrieval
+time and unrelated policy evidence. See the [catalog host protocol](purview-catalog-host.md#selected-policy-refresh-and-catalog-reuse).

@@ -14,7 +14,8 @@ public sealed record PurviewConnectorSubmission(
     string RequestedByObjectId,
     string CorrelationId,
     DateTime RequestedAtUtc,
-    DateTime ExpiresAtUtc);
+    DateTime ExpiresAtUtc,
+    Guid? PolicyId = null);
 
 public sealed record PurviewConnectorSubmissionResult(
     PurviewConnectorStateRecord State,

@@ -22,7 +22,7 @@ public sealed record CatalogHostAssignmentRead(
 
 public interface IPurviewCatalogHostExecutor
 {
-    Task<PurviewPolicyCatalog> ReadCatalogAsync(PurviewConnectorAction action, CancellationToken cancellationToken);
+    Task<PurviewPolicyCatalog> ReadCatalogAsync(PurviewConnectorAction action, CancellationToken cancellationToken, Guid? policyId = null);
     Task<CatalogHostAssignmentRead> ApplyAssignmentAsync(PolicyAssignmentRequest request, CancellationToken cancellationToken);
 }
 
@@ -32,9 +32,9 @@ public sealed class PowerShellPurviewCatalogHostExecutor(
 {
     public async Task<PurviewPolicyCatalog> ReadCatalogAsync(
         PurviewConnectorAction action,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? policyId = null)
     {
-        var read = await ExecuteAsync(action.ToString(), null, cancellationToken);
+        var read = await ExecuteAsync(action.ToString(), null, cancellationToken, policyId);
         return read.Catalog ?? throw new InvalidOperationException("Purview catalog readback was missing.");
     }
 
@@ -62,7 +62,7 @@ public sealed class PowerShellPurviewCatalogHostExecutor(
     private async Task<CatalogHostProcessRead> ExecuteAsync(
         string operation,
         string? assignmentRequestPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? policyId = null)
     {
         var start = new ProcessStartInfo("pwsh.exe")
         {
@@ -86,6 +86,11 @@ public sealed class PowerShellPurviewCatalogHostExecutor(
             start.ArgumentList.Add(assignmentRequestPath);
         }
 
+        if (policyId is { } selected)
+        {
+            start.ArgumentList.Add("-PolicyId");
+            start.ArgumentList.Add(selected.ToString("D"));
+        }
         using var process = Process.Start(start)
             ?? throw new InvalidOperationException("Purview catalog reader could not start.");
         try
@@ -277,8 +282,11 @@ public sealed class PurviewCatalogHostListener
         providerDeadline.CancelAfter(deadline - now);
         try
         {
-            catalog = await _executor.ReadCatalogAsync(candidate.Command.Action, providerDeadline.Token);
+            catalog = await _executor.ReadCatalogAsync(candidate.Command.Action, providerDeadline.Token, candidate.Command.PolicyId);
             PurviewPolicyCatalogValidation.Validate(catalog, _identity.TenantId);
+            if (candidate.Command.PolicyId is { } selected &&
+                (catalog.Items.Count != 1 || catalog.Items[0].Id != selected))
+                throw new InvalidOperationException("Selected policy is missing or mismatched.");
             if (RequireUtc(_utcNow()) >= candidate.Command.ExpiresAtUtc)
             {
                 catalog = null;
@@ -303,7 +311,7 @@ public sealed class PurviewCatalogHostListener
         }
 
         await WriteConnectorResultAsync(candidate.Command, status, catalog, failureCode, cancellationToken);
-        if (status == "Succeeded" && catalog is not null)
+        if (status == "Succeeded" && catalog is not null && candidate.Command.PolicyId is null)
         {
             try
             {

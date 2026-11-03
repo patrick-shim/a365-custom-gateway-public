@@ -18,7 +18,8 @@ public sealed record SubmitPurviewConnectorOperation(
     string ExpectedRowVersion,
     string RequestedByObjectId,
     string CorrelationId,
-    bool ConfirmConnection = false) : IRequest<PurviewConnectorOperationAcceptedResponse>;
+    bool ConfirmConnection = false,
+    Guid? PolicyId = null) : IRequest<PurviewConnectorOperationAcceptedResponse>;
 
 internal sealed class SubmitPurviewConnectorOperationHandler(
     IPurviewConnectorStore store,
@@ -63,6 +64,9 @@ internal sealed class SubmitPurviewConnectorOperationHandler(
                 "If-Match must contain the exact row version returned by the Gateway.",
                 ErrorCodes.CONCURRENCY_CONFLICT);
 
+        if (request.PolicyId == Guid.Empty || (request.PolicyId is not null && request.Type != PurviewConnectorOperationType.RefreshCatalog))
+            throw new ValidationException(new() { ["policyId"] = ["Select one non-empty policy ID for a refresh."] });
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var canonical = string.Join('\n',
             request.Type,
@@ -72,6 +76,8 @@ internal sealed class SubmitPurviewConnectorOperationHandler(
             request.ExpectedRowVersion,
             request.RequestedByObjectId,
             request.ConfirmConnection ? "true" : "false");
+        // Preserve the legacy request hash for full-catalog submissions.
+        if (request.PolicyId is { } policyId) canonical += "\n" + policyId.ToString("D");
         var requestHash = Convert.ToHexStringLower(
             SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
         var result = await store.SubmitAsync(new PurviewConnectorSubmission(
@@ -85,7 +91,7 @@ internal sealed class SubmitPurviewConnectorOperationHandler(
             request.RequestedByObjectId,
             request.CorrelationId,
             now,
-            now.AddMinutes(10)), cancellationToken);
+            now.AddMinutes(10), request.PolicyId), cancellationToken);
 
         return new PurviewConnectorOperationAcceptedResponse(
             result.Operation.Id,

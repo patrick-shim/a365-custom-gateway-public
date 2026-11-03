@@ -2,4 +2,4 @@ namespace Gateway.Contracts.Requests;
 
 public sealed record ConnectPurviewRequest(bool ConfirmConnection);
 
-public sealed record RefreshPurviewCatalogRequest;
+public sealed record RefreshPurviewCatalogRequest(Guid? PolicyId = null);

@@ -110,6 +110,8 @@ internal sealed class RuntimeSchemaInitializer(
                 ON "PurviewConnectorOperations" ("Status", "CreatedAtUtc");
             ALTER TABLE "PurviewConnectorOperations"
                 ADD COLUMN IF NOT EXISTS "TransportCleanedAtUtc" timestamp with time zone NULL;
+            ALTER TABLE "PurviewConnectorOperations"
+                ADD COLUMN IF NOT EXISTS "PolicyId" uuid NULL;
 
             CREATE TABLE IF NOT EXISTS "PurviewCatalogSnapshots" (
                 "Id" uuid PRIMARY KEY,

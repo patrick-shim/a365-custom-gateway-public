@@ -8,6 +8,7 @@ public sealed class PurviewConnectorOperation
     public Guid TenantId { get; set; }
     public Guid ConnectorInstanceId { get; set; }
     public PurviewConnectorOperationType Type { get; set; }
+    public Guid? PolicyId { get; set; }
     public PurviewConnectorOperationStatus Status { get; set; }
     public string CurrentStep { get; set; } = "Queued";
     public int PercentComplete { get; set; }
