@@ -257,6 +257,15 @@ them or copy their secret values into issues, logs, or documentation.
 Ports are configurable during setup. The listeners bind to loopback in the local
 Compose profile.
 
+## Container architecture
+
+Build application images for your Docker host's native architecture. The runtime
+validation workflow runs separately on x64 and ARM64 and publishes
+`runtime-images-X64` and `runtime-images-ARM64` artifacts. Match the artifact to
+`docker info --format '{{.Architecture}}'`; x64 validation does not establish that
+.NET application images work under ARM emulation. The existing S3 development
+image uses x64 compatibility support on ARM hosts.
+
 ## Quiet Windows connector
 
 The Purview catalog host stays running in the background while its certificate-owning

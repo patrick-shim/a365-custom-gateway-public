@@ -67,6 +67,14 @@ preserve the exact task owner, executable, transport identity, credentials and
 pending-operation reconciliation. Windows sign-out ends this supported user-scoped
 lifetime; service hosting without a signed-in user remains outside this release.
 
+### Native runtime image validation
+
+Application images are built and exercised on native x64 and ARM64 runners. Image
+artifacts identify both source revision and architecture. A deployment must select
+native application images; an emulated .NET startup is not an accepted substitute
+for the host architecture check. The existing x64 S3 development dependency uses
+compatibility support on ARM hosts and remains separate from application builds.
+
 ## 1. Purpose
 
 A365 Custom Gateway is an identity, protection, observability, and administration

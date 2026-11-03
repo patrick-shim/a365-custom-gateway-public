@@ -97,6 +97,12 @@ compatibility cannot be demonstrated, retain the supported Windows profile and
 identify the remote profile as unsupported. Do not introduce a periodic refresh
 policy or broaden assignment scope as part of hosting changes.
 
+## Native image release gate
+
+The public runtime workflow validates x64 and ARM64 separately and names its image
+artifacts by runner architecture. Native ARM64 validation is required before
+installing on ARM64 Docker hosts; x64 emulation does not establish compatibility.
+
 ## M7 — Release validation
 
 The Docker runtime workflow covers public-feed image builds, synthetic local

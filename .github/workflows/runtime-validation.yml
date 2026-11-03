@@ -11,7 +11,16 @@ permissions:
 
 jobs:
   runtime:
-    runs-on: ubuntu-24.04
+    name: Runtime (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -23,6 +32,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
+
+      - name: Enable compatibility for the existing x64 S3 development image
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: amd64
 
       - name: Verify source layout and launcher
         shell: pwsh
@@ -136,6 +151,7 @@ jobs:
         run: |
           docker build --build-arg SOURCE_REVISION="$GITHUB_SHA" -f samples/python-foundry-weather-agent/Dockerfile.mcp -t a365-weather-mcp:local samples/python-foundry-weather-agent
           for image in a365-gateway-api:dev a365-gateway-worker:dev a365-gateway-console:dev a365-weather-mcp:local; do
+            test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "${{ matrix.arch }}"
             test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")" = "$GITHUB_SHA"
           done
           docker save a365-gateway-api:dev a365-gateway-worker:dev a365-gateway-console:dev a365-weather-mcp:local | gzip > "$RUNNER_TEMP/runtime-images.tar.gz"
@@ -144,7 +160,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: runtime-images
+          name: runtime-images-${{ runner.arch }}
           path: ${{ runner.temp }}/runtime-images.tar.gz
           retention-days: 2
           compression-level: 0

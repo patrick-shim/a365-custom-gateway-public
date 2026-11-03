@@ -121,8 +121,8 @@ Console footer. A dirty working tree is labeled with a dirty suffix. For exact
 public/local parity, build from the clean published commit and retain the existing
 installation's Compose project, environment file and bootstrap directories.
 
-Successful main-branch validation publishes a short-lived `runtime-images` artifact
-containing the tested Gateway images and optional weather MCP image. Its revision
+Successful main-branch validation publishes short-lived `runtime-images-X64` and `runtime-images-ARM64` artifacts
+containing native tested Gateway images and the optional weather MCP image. Their revision
 labels identify the public commit; it contains no installation configuration.
 This supports installing the same tested images where local package feeds are
 unreachable. Runtime credentials and tenant configuration remain local.
@@ -132,3 +132,6 @@ the certificate-owning user's Windows sign-in. A one-minute recovery trigger
 restores it if stopped and IgnoreNew prevents duplicate listeners. Provider
 PowerShell children are also windowless; recovery never schedules catalog reads. The Console shows its
 heartbeat. See [background lifetime and recovery](../docs/runtime/README.md#quiet-background-connector).
+
+Select the artifact matching the Docker host architecture. The workflow checks
+x64 and ARM64 independently; do not rely on x64 emulation for the .NET runtime.
