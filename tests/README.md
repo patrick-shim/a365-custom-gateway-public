@@ -1,6 +1,6 @@
 # Repository validation
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Run from the repository root with the .NET SDK pinned by `global.json`, PowerShell
 7, Node.js 20, and both frontend packages installed with `npm ci`. These are

@@ -1,6 +1,6 @@
 # Runtime Purview connector and assignment host
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Bootstrap configures a dedicated Entra application, a certificate in the Windows
 executor account's certificate store, and the required Purview management role.

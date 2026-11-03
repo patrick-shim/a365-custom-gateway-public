@@ -1,6 +1,6 @@
 # Gateway API contract
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 The current controller and request/response definitions in `src/Gateway.Api` and
 `src/Gateway.Contracts` are authoritative. This page describes the runtime API;

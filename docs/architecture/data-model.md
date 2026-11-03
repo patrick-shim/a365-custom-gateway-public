@@ -1,6 +1,6 @@
 # Runtime data model
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 PostgreSQL is the authoritative database. The current EF model contains nineteen
 application tables; `GatewaySchemaVersions` records idempotent runtime upgrades.

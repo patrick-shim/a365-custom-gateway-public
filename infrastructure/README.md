@@ -1,6 +1,6 @@
 # Infrastructure assets
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Gateway hosting uses [runtime Compose](../deploy/runtime/README.md): PostgreSQL,
 RabbitMQ, S3-compatible storage and OCI application containers. The base stack

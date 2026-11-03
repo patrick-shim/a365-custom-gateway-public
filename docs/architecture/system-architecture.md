@@ -1,6 +1,6 @@
 # A365 Custom Gateway architecture
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Purview policy content remains owned by policy administrators. The Gateway
 discovers existing compatible policies and applies only reviewed individual-agent

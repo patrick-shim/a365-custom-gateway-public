@@ -1,6 +1,6 @@
 # Console design
 
-**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 The React/Fluent UI Console uses a navy navigation rail, compact headers, layered cards, consistent tables and agent-detail tabs. Fluent theme overrides live in `web/console/src/theme.ts`; shell and surface styles live in `base.css`.
 
