@@ -1,5 +1,7 @@
 # Docker Compose runtime
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 Bootstrap builds and starts the gateway with `.\gateway.cmd up` from the repository root. It collects Microsoft identity, Content Safety and Purview settings and writes ignored `.env.runtime` configuration. Follow the [runtime guide](../../docs/runtime/README.md) for installation state, rebuilds and troubleshooting.
 
 | File | Purpose |

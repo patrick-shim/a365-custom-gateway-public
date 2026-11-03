@@ -1,5 +1,7 @@
 # Gateway runtime guide
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 ## Installation
 
 The terminal installer (`gateway.cmd init`) and React installer (`gateway.cmd gui`) use the same PowerShell engine, configuration schema, reviewed plan and verification. Follow [bootstrap](../../bootstrap/README.md) for tenant prerequisites and permissions. Both collect initial Content Safety and Purview settings; routine policy selection happens in the Console after setup.

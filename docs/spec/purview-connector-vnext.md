@@ -1,5 +1,7 @@
 # Manual Purview refresh
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 **Status:** local Windows implementation with offline regression coverage;
 live tenant and restart acceptance require separate validation.
 

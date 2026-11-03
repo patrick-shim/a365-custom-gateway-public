@@ -1,5 +1,7 @@
 # Gateway API contract
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 The current controller and request/response definitions in `src/Gateway.Api` and
 `src/Gateway.Contracts` are authoritative. This page describes the runtime API;
 policy definitions and classifiers are managed in Purview.

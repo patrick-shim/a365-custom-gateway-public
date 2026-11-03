@@ -1,5 +1,7 @@
 # Protection configuration
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 ## Product ownership
 
 Purview policy administrators own classifiers, sensitive information types,

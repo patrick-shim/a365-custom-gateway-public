@@ -1,5 +1,7 @@
 # Documentation
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 Start with the [project README](../README.md) for the public overview and setup,
 the [technical specification](../SPEC.md) for normative requirements, and
 [contributor guide](../CONTRIBUTING.md) before implementation work.

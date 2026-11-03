@@ -1,7 +1,9 @@
 # Contributing
 
-A365 Custom Gateway is authored by Patrick Shim and distributed under the
-[MIT license](LICENSE). Contributions, technical reviews, and bug reports from
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
+A365 Custom Gateway is co-authored by Patrick Shim and Hyuna Kim and distributed
+under the [MIT license](LICENSE). Contributions, technical reviews, and bug reports from
 Microsoft and the wider community are welcome. Contributions are provided under
 the same license; retain applicable copyright and third-party notices.
 

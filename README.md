@@ -2,7 +2,9 @@
 
 **Release channel: Beta**
 
-**Author:** Patrick Shim · **License:** [MIT](LICENSE)
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
+**License:** [MIT](LICENSE)
 
 See [Contributing](CONTRIBUTING.md) for development and review practices and
 [Security](SECURITY.md) for safe vulnerability reporting. The MIT license permits

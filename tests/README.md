@@ -1,5 +1,7 @@
 # Repository validation
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 Run from the repository root with the .NET SDK pinned by `global.json`, PowerShell
 7, Node.js 20, and both frontend packages installed with `npm ci`. These are
 executable regression projects, not a test-SDK

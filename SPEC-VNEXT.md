@@ -1,5 +1,7 @@
 # Roadmap and release gates
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 **Implemented behavior:** [SPEC.md](SPEC.md)
 **Connector design:** [Manual Purview refresh](docs/spec/purview-connector-vnext.md)
 **Status:** local Windows M1–M5 implemented; live release gates remain unverified;

@@ -1,5 +1,7 @@
 # Product brief
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 A365 Custom Gateway connects independently hosted agents to Microsoft identity, governance and observability. The agent retains its own model and hosting. The gateway supplies per-agent registration, credentials, pre-model evaluation, interaction/activity intake and administrative visibility.
 
 ## Responsibilities

@@ -1,5 +1,7 @@
 # Security
 
+**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+
 ## Reporting a vulnerability
 
 Do not publish exploit details, credentials, tenant identifiers, or user content
