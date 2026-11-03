@@ -45,6 +45,19 @@ A clean revision is claimed only for a clean checkout; local modifications are
 marked dirty. Runtime deployment preserves existing configuration, volumes and
 owned Microsoft resources.
 
+### Quiet background connector
+
+The Windows Purview catalog host is a continuously running, windowless executable
+under the certificate-owning user's interactive Windows session. Its single logon
+trigger has no repetition schedule; Task Scheduler ignores duplicate starts, permits
+an unlimited running lifetime and retries failures three times one minute apart.
+Provider children run with no console window and non-interactive authentication.
+Idle heartbeat is not a catalog refresh. A separate tray interface or Windows service
+is not required. The Console is the management and liveness surface. Recovery must
+preserve the exact task owner, executable, transport identity, credentials and
+pending-operation reconciliation. Windows sign-out ends this supported user-scoped
+lifetime; service hosting without a signed-in user remains outside this release.
+
 ## 1. Purpose
 
 A365 Custom Gateway is an identity, protection, observability, and administration

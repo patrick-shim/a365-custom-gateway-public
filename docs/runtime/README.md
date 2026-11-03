@@ -29,8 +29,8 @@ Do not delete active state to perform a source cleanup or normal rebuild. Missin
 1. Register an external agent in the Console under a selected or newly created blueprint.
 2. Complete the signed-in administrator's Registry confirmation when requested. Console sign-in does not replace tenant consent to the API's delegated Registry permissions.
 3. Wait for the authoritative Active readback; save the one-time agent key securely.
-4. On the agent's Data protection tab, review and confirm an existing compatible Purview policy for its exact individual identity.
-5. Observe assignment status, then test normal allow and synthetic-sensitive block through the agent API. Check sibling scope independently. An assignment write alone is not evidence of blocking.
+4. On the agent's Protection setup tab, enable Prompt Shields and review an existing compatible Purview policy for its exact individual identity.
+5. Choose Apply and verify with the matching agent key, test-user object ID and an approved synthetic DLP sample. For existing assignments, choose Verify protection. Check sibling scope independently. An assignment write alone is not evidence of blocking.
 
 Prompt Shields is an independent per-agent choice. Connection diagnostics are under Settings. Classifiers, rules, exclusions and policy authoring remain in Purview.
 
@@ -39,14 +39,39 @@ Prompt Shields is an independent per-agent choice. Connection diagnostics are un
 Run the [source checks](../../tests/README.md) first. From the repository root, using the existing generated environment file:
 
 ```powershell
-docker build -t a365-gateway-api:dev -f src/Gateway.Api/Dockerfile .
-docker build -t a365-gateway-worker:dev -f src/Gateway.Provisioning.Worker/Dockerfile .
-docker build -t a365-gateway-console:dev web/console
+$sourceRevision = (git rev-parse HEAD).Trim()
+if (git status --porcelain --untracked-files=normal) { $sourceRevision += "-dirty" }
+docker build --build-arg "SOURCE_REVISION=$sourceRevision" -t a365-gateway-api:dev -f src/Gateway.Api/Dockerfile .
+docker build --build-arg "SOURCE_REVISION=$sourceRevision" -t a365-gateway-worker:dev -f src/Gateway.Provisioning.Worker/Dockerfile .
+docker build --build-arg "SOURCE_REVISION=$sourceRevision" -t a365-gateway-console:dev web/console
 docker compose --env-file deploy/runtime/.env.runtime -f deploy/runtime/docker-compose.yml -f deploy/runtime/docker-compose.apps.yml up -d --no-deps api worker console
 .\gateway.cmd verify
 ```
 
 Keep the Compose project name stable so existing database and object-store volumes remain attached. Bootstrap `plan` followed by `apply` is the full configuration/provisioning route; application-only rebuilds above do not provision tenant access or refresh the Windows management host. A changed source or configuration requires a newly accepted bootstrap plan.
+
+## Quiet background connector
+
+The Windows catalog host is a windowless `.exe`, not a recurring PowerShell task.
+It stays running under the certificate-owning Windows user, starts at that user's
+sign-in, and permits only one task instance. Provider children use non-interactive
+PowerShell with `CreateNoWindow`; they do not open terminals or request browser
+sign-in. An idle listener publishes local heartbeat only. Its one-minute Task
+Scheduler interval applies only to crash recovery (up to three retries), not to
+routine launches or catalog refreshes. The task's `Hidden` setting controls its
+visibility in Task Scheduler; it is not what prevents terminal windows.
+
+Use the Console's **Purview connection** page to monitor liveness. Closing the
+Console or locking Windows leaves the listener running. After restarting Windows,
+sign in as the certificate-owning user; signing out ends the supported user-session
+lifetime. A Windows service that runs before sign-in is not part of this release.
+
+Before repairing or replacing the host, verify the task's exact executable path,
+working directory, account and ownership description. Reconcile accepted work and
+wait for active provider operations before stopping it. Preserve its certificate,
+connector ID, transport key and queue directories. Do not rerun initial catalog
+publication merely to update binaries. A listener restart can resume accepted work;
+it must not create a new refresh or repeat an unconfirmed assignment blindly.
 
 ## Diagnostics and API reference
 

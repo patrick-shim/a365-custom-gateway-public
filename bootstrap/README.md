@@ -126,3 +126,8 @@ containing the tested Gateway images and optional weather MCP image. Its revisio
 labels identify the public commit; it contains no installation configuration.
 This supports installing the same tested images where local package feeds are
 unreachable. Runtime credentials and tenant configuration remain local.
+
+The Windows Purview catalog host starts a single windowless background listener at
+the certificate-owning user's Windows sign-in. It stays running without periodic
+launches; provider PowerShell children are also windowless. The Console shows its
+heartbeat. See [background lifetime and recovery](../docs/runtime/README.md#quiet-background-connector).

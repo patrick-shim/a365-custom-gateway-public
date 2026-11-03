@@ -58,6 +58,15 @@ and request-scoped credentials are acceptance gates. No service-hosting or M6
 connector changes are included. Source-revision labels allow comparison between
 public source and local application images.
 
+## Windows background lifetime
+
+The supported beta already uses a windowless executable supervised by a single
+Windows sign-in task. It stays running without a repeating launch timer, keeps
+provider PowerShell children invisible and exposes liveness in the Console.
+Failure retries are bounded; permanent certificate or configuration errors require
+repair. This user-session background lifetime is the accepted local experience.
+An always-on service before Windows sign-in remains deferred with M6 below.
+
 ## M6 — Server/cloud connector (deferred)
 
 Before implementation, demonstrate that the required Purview management operations

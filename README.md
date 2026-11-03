@@ -257,6 +257,19 @@ them or copy their secret values into issues, logs, or documentation.
 Ports are configurable during setup. The listeners bind to loopback in the local
 Compose profile.
 
+## Quiet Windows connector
+
+The Purview catalog host stays running in the background while its certificate-owning
+Windows user is signed in. It is a windowless executable, starts automatically at
+that user's Windows sign-in, and launches provider PowerShell processes without
+console windows. It has no recurring one-minute launch or automatic catalog refresh.
+Task Scheduler retries a crashed listener up to three times at one-minute intervals;
+continued failures require repair through the Console's connection diagnostics.
+The Console reports its heartbeat, so a separate tray application is unnecessary.
+After restarting Windows, sign in to that account to restore the connector. Signing
+out stops this user-scoped component; Docker runtime protection is independent of
+catalog-host liveness. See [runtime operations](docs/runtime/README.md#quiet-background-connector).
+
 ## First use
 
 1. Sign in with a user assigned an appropriate Gateway role.
