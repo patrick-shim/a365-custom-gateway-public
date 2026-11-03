@@ -1,6 +1,6 @@
 # Individual-agent Purview policy consumption
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Product boundary: policy owners author in Purview; gateway administrators select
 existing compatible policies and assign individual agent identities.

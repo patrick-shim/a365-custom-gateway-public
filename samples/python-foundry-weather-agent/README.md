@@ -1,6 +1,6 @@
 # Python Foundry and MCP Weather Agent
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 This standalone sample is a small Flask chat application for demonstrating an
 external agent against a running A365 Custom Gateway. The operator selects any

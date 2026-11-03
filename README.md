@@ -2,7 +2,7 @@
 
 **Release channel: Beta**
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 **License:** [MIT](LICENSE)
 

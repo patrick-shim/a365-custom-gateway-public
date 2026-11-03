@@ -1,6 +1,6 @@
 # Runtime gateway bootstrap
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 Bootstrap installs the gateway on Docker Compose: PostgreSQL, RabbitMQ,
 S3-compatible storage, the C# API and worker, and the React Console. The base

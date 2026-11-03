@@ -1,6 +1,6 @@
 # Linux development prerequisites
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 `install-linux-dependencies.sh` prepares Ubuntu **22.04, 24.04 or 26.04 on x86-64**. Intel 13th-generation processors use this architecture. Installation requires a normal login user with sudo access, systemd and internet access to Microsoft, Docker, Node.js and Ubuntu package services.
 

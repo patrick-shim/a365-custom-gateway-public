@@ -1,6 +1,6 @@
 # Standalone operator and development scripts
 
-**Authors:** Patrick Shim and Hyuna Kim (Security Solution Engineer at Microsoft Korea)
+**Authors:** Patrick Shim and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
 
 These scripts are not part of normal Gateway startup. Run them explicitly from
 the repository root. They retain their existing authentication and safety checks.
