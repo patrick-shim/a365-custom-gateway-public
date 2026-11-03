@@ -1,6 +1,10 @@
 # 개별 Agent ID용 Purview DLP 정책 만들기
 
-**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Main Author:** [Patrick Shim](mailto:patrickshim@microsoft.com)
+
+**Co-author:** [Hyuna Kim](mailto:hyunakim@microsoft.com)
+
+**Version:** `beta-local-dev-v.1.00`
 
 `New-PurviewAgentDlpPolicy.ps1` 파일 하나를 로컬 Windows PC의 원하는 폴더에
 복사해서 실행합니다. Gateway 실행, Docker, Gateway 키, bootstrap 설정은 필요하지

@@ -4,7 +4,11 @@
 **Repository:** `patrick-shim/a365-custom-gateway-public`
 **Deployment profile:** `runtime`
 **Primary host profile:** Windows x86-64 with Docker Linux containers
-**Authors:** [Patrick Shim](mailto:patrickshim@microsoft.com) (Senior Sales Advisor, AI Security GBB, Microsoft Corp.) and [Hyuna Kim](mailto:hyunakim@microsoft.com) (Security Solution Engineer at Microsoft Korea)
+**Main Author:** [Patrick Shim](mailto:patrickshim@microsoft.com)
+
+**Co-author:** [Hyuna Kim](mailto:hyunakim@microsoft.com)
+
+**Version:** `beta-local-dev-v.1.00`
 **License:** [MIT](LICENSE)
 
 This specification describes the implemented product. Development and validation
