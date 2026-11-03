@@ -22,26 +22,24 @@ read-only mount.
 
 ## Beta protection setup
 
-The Console provides one guided protection setup surface for Prompt Shields,
-existing-policy review, assignment and explicit verification. Apply and verify
-retains the reviewed exact-target confirmation contract. Verification uses the
-registered agent credential in memory, the selected test-user context, a normal
-prompt, a synthetic Prompt Shields probe and an operator-approved policy-matching
-synthetic DLP sample. It calls the existing prompt-evaluation API only; expected
-provider-specific blocks count as success and no model/interaction is fabricated.
-The UI validates structured verdicts, matching receipts, current assignment and
-unchanged agent settings before reporting Ready for beta use. Verification must
-never mark disabled, skipped, unavailable, wrong-provider or malformed results as
-success. Only transient assignment status is polled with a bounded deadline;
-content submissions and uncertain mutations are never automatically retried.
-Closing/unmounting cancels browser verification, releases keys and cannot undo an
-accepted durable assignment. Reopening requires an explicit fresh run. Historical
-allow/block observations are displayed as evidence, not an active validation job.
-Missing allow/block evidence is labeled Checks not yet passed. This describes
-missing successful outcomes, not disabled protection or a background job. The
-screen names the normal-allow and synthetic-DLP-block requests that are required.
-New verification does not require management availability for an already confirmed
-assignment. New assignments retain connector readiness checks and reviewed writes.
+The Console provides one protection setup surface for Prompt Shields and reviewed
+individual-agent policy assignment. Select a compatible saved policy, review the
+exact policy and individual identity, and choose Assign policy. The existing API
+review and confirmation contracts retain tenant, actor, identity, policy-revision,
+protection-revision, expiry and concurrency checks. The connector reads the policy
+live, preserves unrelated scope and rules, and confirms the exact target by
+readback before the Console reports Assigned.
+
+Assignment setup does not request an agent key, test-user ID or synthetic content.
+It has no protection-verification drawer, test-evidence warning, or mandatory
+allow/block probes. Applying, Assigned, NeedsAttention and failed/unknown outcomes
+remain distinct; accepted operations continue in the background and the Console
+polls authoritative status. Missing synthetic test evidence does not block use.
+Test Agent remains an optional, separate diagnostic tool. Required runtime
+protection still evaluates each request and fails closed when unavailable;
+assignment confirmation does not claim a tested enforcement outcome or downstream
+visibility.
+
 Public UI/source documentation consistently uses Beta as the release channel.
 Gateway application images carry their source revision; the Console displays it.
 A clean revision is claimed only for a clean checkout; local modifications are
@@ -569,8 +567,8 @@ ignored, while a malformed connector result terminates only its bound operation 
 `PURVIEW_CONNECTOR_RESULT_INVALID` and preserves the previously accepted catalog.
 
 The Windows scheduled task starts one headless listener when the certificate-
-owning user signs in. Its only trigger is that user logon: it has no repetition
-interval or other time-based trigger. Task launch and every bounded provider child
+owning user signs in. A one-minute recovery trigger restores a stopped listener;
+duplicate starts are ignored while it is running. Task launch and every bounded provider child
 process must be windowless and must never display a terminal to the interactive
 user. Idle polling and heartbeat, page/GET access, and ordinary API, Docker, or
 listener restart do not create provider work. Restart recovery may resume an

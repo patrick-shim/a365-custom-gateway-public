@@ -290,31 +290,20 @@ catalog-host liveness. See [runtime operations](docs/runtime/README.md#quiet-bac
 3. Save its one-time Gateway API key securely.
 4. Open **Protection setup**, enable Prompt Shields, and select an existing
    compatible Purview DLP policy.
-5. Review the exact agent/policy change and choose **Apply and verify**. Supply
-   the matching Gateway key, a test-user object ID, and an approved synthetic
-   sample that should match the selected policy. Confirm that only synthetic
-   test content is sent to the configured protection services.
-6. Follow the bounded assignment and protection checks on the same screen.
-   Expected Prompt Shields and DLP blocks count as successful verification.
-   **Ready for beta use** means this run observed the expected outcomes under
-   unchanged settings; it does not promise future availability or downstream
-   Microsoft visibility.
+5. Review the exact agent/policy change and choose **Assign policy**.
+6. Wait for **Assigned**, which confirms that Purview includes this individual
+   agent. The request continues in the background if you leave the page.
 
-**Checks not yet passed** means normal-allow and DLP-block evidence is incomplete;
-it does not mean DLP is off or that a background verification job is running.
+No agent key, synthetic sample or extra protection-verification step is required
+for policy assignment. You can use the agent after assignment is confirmed.
+Prompt Shields and Purview evaluate actual requests using the configured settings;
+required protection continues to fail closed if unavailable. **Test Agent** remains
+available separately when you want to inspect request outcomes.
 
-For an already assigned policy, **Run protection checks** runs the same checks without
-reapplying it. Verification stays in the open browser flow; closing it cancels
-remaining checks and clears entered credentials. Accepted assignments continue on
-the server. An unavailable or unknown result stops verification with recovery
-instructions; the Console never silently retries a content submission or assignment.
-Keys are used only in memory for the run. Normal checks issue unused receipts that
-expire; no language model, completed interaction, or success telemetry is fabricated.
-
-Assignment confirmation is not enforcement proof. Other applicable Purview policies
-may also cause a block, so the verification result does not attribute a block to one
-selected policy. Verify same-blueprint sibling scope and downstream destinations
-separately when validating a tenant deployment.
+An assignment confirmation records the policy target; it is not a claim that a
+particular request was tested or that data is visible downstream. Deployment
+validation can independently exercise normal allow, provider-specific blocks and
+same-blueprint sibling scope.
 
 External agent IDs are 3–128 characters, start with a letter or number, and may
 contain letters, numbers, dots, hyphens, and underscores. The Console validates

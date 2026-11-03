@@ -30,7 +30,7 @@ Do not delete active state to perform a source cleanup or normal rebuild. Missin
 2. Complete the signed-in administrator's Registry confirmation when requested. Console sign-in does not replace tenant consent to the API's delegated Registry permissions.
 3. Wait for the authoritative Active readback; save the one-time agent key securely.
 4. On the agent's Protection setup tab, enable Prompt Shields and review an existing compatible Purview policy for its exact individual identity.
-5. Choose Apply and verify with the matching agent key, test-user object ID and an approved synthetic DLP sample. For existing assignments, choose Run protection checks. Check sibling scope independently. An assignment write alone is not evidence of blocking.
+5. Choose **Assign policy** and wait for **Assigned**. No extra verification or synthetic sample is required. Use **Test Agent** separately for optional diagnostics; validate enforcement and sibling scope independently when testing a deployment.
 
 Prompt Shields is an independent per-agent choice. Connection diagnostics are under Settings. Classifiers, rules, exclusions and policy authoring remain in Purview.
 

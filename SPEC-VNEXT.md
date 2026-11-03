@@ -51,13 +51,14 @@ restart recovery, or downstream Microsoft-service visibility.
 
 ## Beta protection setup
 
-The current beta adds explicit browser-scoped Apply and verify and Run protection checks
-runs using existing reviewed assignment and prompt-evaluation contracts. Bounded
-progress, cancellation, expected provider-specific blocks, current-state readback,
-and request-scoped credentials are acceptance gates. Missing successful test
-evidence is explicitly distinguished from assignment and active background work.
-No service-hosting or M6 connector changes are included. Source-revision labels allow comparison between
-public source and local application images.
+The current beta ends policy setup at confirmed individual-agent assignment.
+The Console retains exact-target review, asynchronous status and actionable
+assignment errors, without an additional protection-verification step or a
+requirement to submit synthetic probes. Optional Test Agent diagnostics remain
+separate. Runtime protection and tenant-backed release gates remain unchanged;
+assignment alone is not a claim of tested enforcement or downstream visibility.
+No service-hosting or M6 connector changes are included. Source-revision labels
+allow comparison between public source and local application images.
 
 ## Windows background lifetime
 

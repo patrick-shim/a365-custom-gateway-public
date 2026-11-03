@@ -42,7 +42,7 @@ or delays exact-ID readback, the Console identifies the outcome as unconfirmed,
 stops active animation, and directs the administrator to refresh and reconcile
 the existing operation after waiting; it never claims that creation completed.
 
-Policy assignment distinguishes applying, assigned/awaiting verification, current allow/block observations, failure and unavailable status. Applying assignment displays elapsed time and last successful status readback. Stop indicating active progress when status cannot be read. A write or elapsed time alone does not establish synchronized enforcement. Cached data must not conceal a failed catalog refresh.
+Policy assignment distinguishes applying, assigned, needs-attention, failure and unavailable status. Applying assignment displays elapsed time and last successful status readback. Stop indicating active progress when status cannot be read. A write or elapsed time alone does not establish synchronized enforcement. Cached data must not conceal a failed catalog refresh.
 
 API keys are visible once and are not retained in query caches. Role-aware controls supplement server authorization. Search cursors and operation identifiers come from the server. Failed or uncertain mutations must not display fabricated success.
 
@@ -123,19 +123,14 @@ React Setup is a separate frontend served by the local setup host. It collects t
 
 Run [Console and setup tests](../../tests/README.md) before deploying UI changes. Backend API contracts and permission checks remain authoritative.
 
-## Beta verification
+## Beta policy assignment
 
-Apply and verify opens a reviewed flow for the exact agent and policy. Verify
-protection uses an existing assignment. The operator supplies a registration-bound
-key and approved synthetic DLP content; the test-user ID defaults to the signed-in
-user. The UI clears the key on submission/close and keeps it only for that run.
-It waits for current assignment evidence, sends normal, Prompt Shields, and DLP
-probes through the real prompt-evaluation API, and rechecks assignment/settings.
-Only the expected provider-specific decisions pass. Allowed DLP samples, unrelated
-blocks, unavailable providers and changed configuration stop with a relevant next
-action. Readiness is a time-bound observation, not a permanent guarantee. No GET
-or page load starts a verification run or Purview management read.
-Assignment polling is bounded; cancellation stops subsequent requests without
-rolling back accepted work. The screen explains that assignment continues after
-closing. Historical evidence never appears as an indefinitely running check.
+Select a compatible policy, review the exact individual agent and policy change,
+and choose Assign policy. This uses the existing review/confirmation API contract;
+no agent key, test-user ID, synthetic sample or protection-check drawer is needed.
+Assignment status polls authoritative state and ends at Assigned after provider
+readback. Unknown, failed and changed-scope outcomes retain actionable messages.
+No missing-test warning follows a successful assignment. Test Agent remains a
+separate optional diagnostic action. The Console never turns assignment readback
+into a claim of successful allow/block testing. Runtime enforcement is unchanged.
 The Console displays Beta and the build's source revision in its shell.

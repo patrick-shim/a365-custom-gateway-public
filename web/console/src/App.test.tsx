@@ -686,7 +686,7 @@ describe("Console routes with actual API envelopes", () => {
     renderApp(`/agents/${agentId}?tab=data-protection`);
     expect(await screen.findByText("No policies selected in this Console. Policies scoped elsewhere in Purview may still apply.")).toBeVisible();
     expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
-    expect(screen.getByText(`Gateway content evaluation: ${enabled === true ? "Enabled · verification needed" : enabled === false ? "Not enabled" : "Not reported"}`)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Run protection checks" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
   });
 
@@ -710,8 +710,7 @@ describe("Console routes with actual API envelopes", () => {
     }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
     expect(await screen.findByText("This assignment no longer matches the current verified catalog. Refresh the catalog, review the exact policy revision and agent scope, then apply it again if it is still appropriate.")).toBeVisible();
-    expect(screen.getAllByText("Needs Attention")).toHaveLength(2);
-    expect(screen.getByText("One or more saved assignments need review before enforcement can be verified")).toBeVisible();
+    expect(screen.getByText("Needs Attention")).toBeVisible();
     expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
   });
 
@@ -761,7 +760,7 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
     expect(await screen.findByText(`Agent identity: ${agent.agent365.agentId}`)).toBeVisible();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Apply without verification" }));
+    await user.click(screen.getByRole("button", { name: "Assign policy" }));
     expect(await screen.findByText("Applying assignment")).toBeVisible();
     expect(screen.getByRole("progressbar", { name: "Applying assignment" })).toBeVisible();
     expect(screen.getByText(/Elapsed: 2m/)).toBeVisible();
@@ -775,7 +774,8 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Check assignment status" }));
     expect(await screen.findByText("Assigned", { exact: true })).toBeVisible();
     expect(screen.queryByRole("progressbar", { name: "Applying assignment" })).not.toBeInTheDocument();
-    expect(screen.getByText("Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Run protection checks" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Registered API key")).not.toBeInTheDocument();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
   });
 
@@ -860,7 +860,7 @@ describe("Console routes with actual API envelopes", () => {
     await screen.findByRole("option", { name: "Previous DLP" });
     await user.selectOptions(screen.getByLabelText("Choose an existing policy"), policyId);
     await user.click(screen.getByRole("button", { name: "Review assignment" }));
-    expect(await screen.findByRole("button", { name: "Apply without verification" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Assign policy" })).toBeEnabled();
     const mutations = server.requests.filter(request => request.method === "POST");
     expect(mutations).toHaveLength(1);
     expect(mutations[0].path).toBe(`/api/v1/agents/${agentId}/purview-policies/review`);
@@ -925,12 +925,15 @@ describe("Console routes with actual API envelopes", () => {
     expect(screen.queryByRole("progressbar", { name: "Applying assignment" })).not.toBeInTheDocument();
   });
 
-  it("does not report assigned policy state as verified blocking without both gateway observations", async () => {
+  it.each([null, new Date().toISOString()])("finishes assignment without requiring block evidence (%s) or submitting probes", async blockObservedAtUtc => {
     server.handlers.set(`GET /api/v1/agents/${agentId}/purview-policies`, () => ({ agentId, agentIdentityId: agent.agent365.agentId, bindingCurrent: true,
-      allowObservedAtUtc: new Date().toISOString(), blockObservedAtUtc: null,
+      allowObservedAtUtc: new Date().toISOString(), blockObservedAtUtc,
       items: [{ operationId, policyId: operationId, policyName: "Existing DLP", status: "Assigned", failureCode: null, assignedAtUtc: new Date().toISOString() }] }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
-    expect(await screen.findByText("Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically.")).toBeVisible();
+    expect(await screen.findByText("Assigned", { exact: true })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Run protection checks" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Checks Not Yet Passed")).not.toBeInTheDocument();
+    expect(server.requests.every(request => request.method === "GET")).toBe(true);
     expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
   });
 

@@ -192,7 +192,6 @@ export function AgentDetail() {
                 <AgentDataProtection
                   key={`protection-${id}`}
                   agent={a}
-                  onTest={() => setTesting(true)}
                 />
               </>
             )}

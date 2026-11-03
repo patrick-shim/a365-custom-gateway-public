@@ -15,23 +15,15 @@ import {
   Spinner,
   Text,
 } from "@fluentui/react-components";
-import { ProtectionVerificationPanel } from "./ProtectionVerificationPanel";
 import { api } from "../../api/client";
 import { ApiError } from "../../api/errors";
 import type { AgentDetail, PurviewConnection } from "../../api/types";
-import { evaluationLabel } from "../../api/display";
 import { ErrorState } from "../../components/ErrorState";
 import { RefreshIndicator } from "../../components/RefreshIndicator";
 import { StatusPill } from "../../components/StatusPill";
 import { purviewConnectionQueryKey, purviewPolicyCatalogQueryKey } from "../../api/queryKeys";
 
-export function AgentDataProtection({
-  agent,
-  onTest,
-}: {
-  agent: AgentDetail;
-  onTest?: () => void;
-}) {
+export function AgentDataProtection({ agent }: { agent: AgentDetail }) {
   const identity = agent.agent365?.agentId;
   const cache = useQueryClient();
   const catalog = useQuery({
@@ -59,9 +51,6 @@ export function AgentDataProtection({
         ? 5000
         : false,
   });
-  const [verification, setVerification] = useState<{
-    review?: Awaited<ReturnType<typeof api.reviewAgentPolicy>>;
-  } | null>(null);
   const [selected, setSelected] = useState("");
   const [review, setReview] = useState<Awaited<ReturnType<typeof api.reviewAgentPolicy>> | null>(
     null,
@@ -140,8 +129,6 @@ export function AgentDataProtection({
     }
   }
   const state = assignments.isError ? undefined : assignments.data;
-  const needsAttention = state?.items.some((item) => item.status === "NeedsAttention") ?? false;
-  const observed = state?.bindingCurrent && state.allowObservedAtUtc && state.blockObservedAtUtc;
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <Card style={{ padding: 24, gap: 12 }}>
@@ -254,23 +241,12 @@ export function AgentDataProtection({
               <Button
                 appearance="primary"
                 disabled={
-                  busy ||
-                  !reviewReadiness.ready ||
-                  Date.parse(review.expiresAtUtc) <= Date.now() ||
-                  agent.status !== "Active"
-                }
-                onClick={() => setVerification({ review })}
-              >
-                Apply and verify
-              </Button>
-              <Button
-                disabled={
                   busy || !reviewReadiness.ready || Date.parse(review.expiresAtUtc) <= Date.now()
                 }
                 icon={action === "confirm" ? <Spinner size="tiny" /> : undefined}
                 onClick={() => void confirm()}
               >
-                {action === "confirm" ? "Submitting assignment…" : "Apply without verification"}
+                {action === "confirm" ? "Submitting assignment…" : "Assign policy"}
               </Button>
               <Button disabled={busy} onClick={() => setReview(null)}>
                 Cancel
@@ -379,8 +355,7 @@ export function AgentDataProtection({
               )}
               {x.status === "Assigned" && x.assignedAtUtc && (
                 <Caption1>
-                  Purview assignment confirmed {new Date(x.assignedAtUtc).toLocaleString()}. Choose
-                  Run protection checks to check current runtime outcomes.
+                  Purview assignment confirmed {new Date(x.assignedAtUtc).toLocaleString()}.
                 </Caption1>
               )}
               {x.failureCode === "ASSIGNMENT_RESULT_INVALID" ? (
@@ -418,72 +393,6 @@ export function AgentDataProtection({
           Open policies in Purview ↗
         </a>
       </Card>
-      <Card style={{ padding: 24, gap: 12 }}>
-        <Text as="h2" size={400} weight="semibold">
-          Protection verification
-        </Text>
-        <StatusPill
-          value={
-            observed
-              ? "EvidenceObserved"
-              : needsAttention
-                ? "NeedsAttention"
-                : state?.bindingCurrent
-                  ? "ChecksNotYetPassed"
-                  : state?.items.length
-                    ? "Unconfirmed"
-                    : "NotConfigured"
-          }
-        />
-        <Body1>
-          {observed
-            ? "Allow and DLP block observed under the current configuration"
-            : needsAttention
-              ? "One or more saved assignments need review before enforcement can be verified"
-              : state?.bindingCurrent
-                ? "Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically."
-                : state?.items.length
-                  ? "Enforcement readiness not confirmed · protected requests fail closed"
-                  : `Gateway content evaluation: ${evaluationLabel(agent.features?.purviewEnabled)}`}
-        </Body1>
-        <Button
-          appearance="primary"
-          disabled={
-            agent.status !== "Active" || !!pending || !state?.bindingCurrent || assignments.isError
-          }
-          onClick={() => setVerification({})}
-        >
-          Run protection checks
-        </Button>
-        {state?.allowObservedAtUtc && (
-          <Caption1>
-            Last gateway allow: {new Date(state.allowObservedAtUtc).toLocaleString()}
-          </Caption1>
-        )}
-        {state?.blockObservedAtUtc && (
-          <Caption1>
-            Last gateway DLP block: {new Date(state.blockObservedAtUtc).toLocaleString()}
-          </Caption1>
-        )}
-        <Caption1>
-          These observations come from the gateway API under this agent’s current configuration.
-          Purview evaluates all applicable policies; a block alone does not identify which policy
-          caused it.
-        </Caption1>
-      </Card>
-      {verification && (
-        <ProtectionVerificationPanel
-          agent={agent}
-          review={verification.review}
-          onTest={onTest}
-          onClose={() => setVerification(null)}
-          onFinished={() => {
-            setReview(null);
-            void cache.invalidateQueries({ queryKey: ["agent-policies", agent.agentId] });
-            void cache.invalidateQueries({ queryKey: ["agent", agent.agentId] });
-          }}
-        />
-      )}
     </div>
   );
 }

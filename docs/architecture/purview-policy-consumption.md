@@ -158,13 +158,13 @@ that assignment `NeedsAttention`, advances only the affected agent's protection
 revision, and invalidates its prior evidence. Missing live runtime proof still
 fails closed.
 
-The Console shows Applying assignment, Assigned/awaiting gateway verification,
-Gateway allow and block verified, and Assignment not confirmed separately. The
-last state is based on actual prompt-evaluation records for the current agent
-configuration, not on a successful scope write. It does not attribute a verdict
-to one selected policy when other policies may also apply.
+The Console shows Applying assignment, Assigned, NeedsAttention and unconfirmed
+outcomes separately. Assigned is based on confirmed exact-target scope readback.
+It does not depend on synthetic prompt-evaluation records or imply tested blocking.
 
 ## Enforcement verification
+
+These are deployment-validation checks, not required Console assignment steps.
 
 1. Read the selected policy and confirm compatibility.
 2. Review and confirm the exact individual identity. Check fresh scope readback and preservation of unrelated targets and exclusions.
@@ -195,12 +195,12 @@ operator validation rather than a documentation claim.
 * [Set-DlpCompliancePolicy Locations](https://learn.microsoft.com/en-us/powershell/module/exchangepowershell/set-dlpcompliancepolicy?view=exchange-ps#-locations)
 * [Purview API integration](https://learn.microsoft.com/en-us/purview/developer/use-the-api)
 
-## Beta verification flow
+## Beta assignment flow
 
-The Console explicitly orchestrates reviewed assignment and prompt evaluation
-without adding a new runtime endpoint or relaxing fail-closed protection. It uses
-current assignment readback and checks normal allow, Prompt Shields block, and DLP
-block using operator-approved synthetic content. A policy-specific block is not
-inferred from arbitrary sample text or from another provider's rejection. Recorded
-allow/block observations remain separate from a currently running check. No manual
-catalog sync is required solely to turn historical evidence into a green badge.
+The Console ends setup at confirmed individual-agent assignment. It retains the
+reviewed exact-target operation and authoritative readback without orchestrating
+synthetic content evaluation. Missing allow/block observations do not require an
+operator action after assignment. Test Agent remains available separately.
+Runtime scope checks, receipt binding and fail-closed evaluation remain unchanged;
+provider-specific enforcement and sibling isolation are independent validation
+concerns, not mandatory Console setup steps.
