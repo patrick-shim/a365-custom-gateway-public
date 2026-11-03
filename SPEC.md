@@ -15,7 +15,10 @@ Container runtime validation exercises the installer build, environment generati
 deployment, and health checks with synthetic identities and no Microsoft mutations.
 Each operator selects their own tenant and service access; author-owned credentials
 are never required. Validation does not replace tenant-backed installation and
-protection release gates.
+protection release gates. On Linux, bootstrap prepares the dedicated blueprint
+credential directory for the non-root worker before service startup, rejects
+linked directory paths, and preserves existing credential files and the API
+read-only mount.
 
 ## 1. Purpose
 

@@ -221,7 +221,9 @@ chmod +x ./gateway
 ```
 
 Choose Purview disabled for this profile. The current Linux runtime cannot
-provision or run the certificate-backed Purview management component.
+provision or run the certificate-backed Purview management component. Before
+starting services, bootstrap gives the non-root worker ownership of its dedicated
+blueprint-credential directory; the API mounts that directory read-only.
 
 The terminal and graphical installers collect the same settings and invoke the
 same bootstrap engine. Setup explicitly covers tenant identity, Agent 365,

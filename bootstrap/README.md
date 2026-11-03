@@ -48,7 +48,11 @@ Manual sync, diagnostics, policy selection, and individual-agent assignment.
 Configuration must explicitly select `deployProfile: runtime`. The
 [example](config.example.runtime.json) documents fields; the
 [schema](config.schema.json) rejects legacy profiles. Existing configuration and
-credentials are preserved. Do not place tokens, passwords, private certificates,
+credentials are preserved. On Linux, Compose runs a short-lived root helper before
+service startup to set ownership and mode 0700 on the dedicated blueprint-credential
+directory for the image's non-root application user. It does not recursively change
+ownership or alter existing credential files. Linked directory paths are rejected,
+and the API mount remains read-only. Do not place tokens, passwords, private certificates,
 Gateway keys, or prompt content in checked-in configuration.
 
 ## Commands

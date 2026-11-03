@@ -80,7 +80,9 @@ The Docker runtime workflow covers public-feed image builds, synthetic local
 configuration, readiness, queue consumption, API documentation, and isolated data
 service regressions. It does not run Microsoft provisioning, Windows setup, or
 live protection checks. Those gates use the operator-selected tenant and dedicated
-test resources and remain unverified until separately exercised.
+test resources and remain unverified until separately exercised. Container
+validation also checks that the non-root worker can write blueprint credentials,
+the API can read them, and the API mount rejects writes.
 
 The following evidence is required before claiming the corresponding capability:
 

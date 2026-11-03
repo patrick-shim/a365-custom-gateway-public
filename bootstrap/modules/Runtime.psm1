@@ -943,6 +943,24 @@ function Deploy-GatewayRuntime {
     $composeDir = Get-GatewayRuntimeComposeDirectory
     Push-Location -LiteralPath $composeDir
     try {
+        if ($IsLinux) {
+            $root = Get-RepositoryRoot
+            foreach ($relativePath in @('.bootstrap', '.bootstrap/secrets', '.bootstrap/secrets/blueprint-credentials')) {
+                $path = Join-Path $root $relativePath
+                if ((Test-Path -LiteralPath $path) -and
+                    ((Get-Item -LiteralPath $path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                    throw 'The runtime credential directory must not contain linked paths.'
+                }
+            }
+            # Docker creates missing Linux bind directories as root. Prepare only
+            # this directory for the image's non-root user; never rewrite its files.
+            Invoke-BootstrapCommand -FilePath 'docker' -ArgumentList @(
+                'compose', '--env-file', $EnvFile,
+                '-f', 'docker-compose.yml', '-f', 'docker-compose.apps.yml',
+                'run', '--rm', '--no-deps', '--user', '0', '--entrypoint', 'sh', 'worker',
+                '-c', 'test -n "$APP_UID" && chown "$APP_UID:$APP_UID" /app/blueprint-credentials && chmod 700 /app/blueprint-credentials'
+            ) | Out-Null
+        }
         Invoke-BootstrapCommand -FilePath 'docker' -ArgumentList @(
             'compose',
             '--env-file', $EnvFile,

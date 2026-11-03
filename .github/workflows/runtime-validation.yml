@@ -123,8 +123,9 @@ jobs:
         run: |
           cd deploy/runtime
           dc=(docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.apps.yml)
-          "${dc[@]}" exec -T worker bash -c 'set -eu; probe=/app/blueprint-credentials/.validation-write; printf synthetic > "$probe"; rm "$probe"'
-          "${dc[@]}" exec -T api bash -c 'test -r /app/blueprint-credentials && ! test -w /app/blueprint-credentials'
+          "${dc[@]}" exec -T worker bash -c 'set -eu; test "$(id -u)" != 0; umask 077; printf synthetic > /app/blueprint-credentials/.validation-write'
+          "${dc[@]}" exec -T api bash -c 'set -eu; test "$(id -u)" != 0; test "$(cat /app/blueprint-credentials/.validation-write)" = synthetic; ! test -w /app/blueprint-credentials'
+          "${dc[@]}" exec -T worker rm /app/blueprint-credentials/.validation-write
 
       - name: Show container diagnostics on failure
         if: failure()
