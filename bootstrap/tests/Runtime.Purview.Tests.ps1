@@ -88,10 +88,15 @@ $module = Get-Module RuntimePurview
         [pscustomobject]@{ Execute=$Execute; Arguments=$Argument; WorkingDirectory=$WorkingDirectory }
     }
     function script:New-ScheduledTaskTrigger {
-        param([switch]$AtLogOn, [string]$User)
-        if (-not $AtLogOn -or [string]::IsNullOrWhiteSpace($User)) { throw 'Only a logon listener trigger is allowed.' }
+        param([switch]$AtLogOn, [string]$User, [switch]$Once, [DateTime]$At, [TimeSpan]$RepetitionInterval)
         $script:triggerCalls++
-        [pscustomobject]@{ AtLogOn=$true; User=$User }
+        if ($AtLogOn -and -not $Once -and -not [string]::IsNullOrWhiteSpace($User)) {
+            return [pscustomobject]@{ AtLogOn=$true; User=$User }
+        }
+        if ($Once -and -not $AtLogOn -and $RepetitionInterval -eq [TimeSpan]::FromMinutes(1) -and $At -gt (Get-Date)) {
+            return [pscustomobject]@{ AtLogOn=$false; Once=$true; RepetitionInterval=$RepetitionInterval }
+        }
+        throw 'Expected a logon trigger or a one-minute windowless recovery trigger.'
     }
     function script:New-ScheduledTaskPrincipal {
         param([string]$UserId, [string]$LogonType, [string]$RunLevel)
@@ -130,10 +135,12 @@ $module = Get-Module RuntimePurview
         $catalog = [ordered]@{ tenantId=$identity.tenantId; retrievedAtUtc=[DateTimeOffset]::UtcNow.ToString('O'); items=@() }
         $result = Start-RuntimePurviewCatalogHost -Identity $identity -InitialCatalog $catalog
         if ($script:dotnetPublishCalls -ne 1 -or $script:publishCalls -ne 1) { throw 'Listener setup did not build once and synchronously publish exactly one already-verified bootstrap catalog.' }
-        if ($script:triggerCalls -ne 1 -or $null -eq $script:registeredTask -or
-            $script:registeredTask.Trigger.Count -ne 1 -or -not $script:registeredTask.Trigger[0].AtLogOn -or
-            $null -ne $script:registeredTask.Trigger[0].PSObject.Properties['Repetition']) {
-            throw 'Purview listener task must have exactly one logon trigger.'
+        if ($script:triggerCalls -ne 2 -or $null -eq $script:registeredTask -or
+            $script:registeredTask.Trigger.Count -ne 2 -or -not $script:registeredTask.Trigger[0].AtLogOn -or
+            $null -ne $script:registeredTask.Trigger[0].PSObject.Properties['Repetition'] -or
+            -not $script:registeredTask.Trigger[1].Once -or
+            $script:registeredTask.Trigger[1].RepetitionInterval -ne [TimeSpan]::FromMinutes(1)) {
+            throw 'Purview listener task must have one logon trigger and one recovery trigger.'
         }
         if ([IO.Path]::GetFileName([string]$script:registeredTask.Action.Execute) -cne 'Gateway.Purview.CatalogHost.exe' -or
             $script:registeredTask.Action.Arguments -match '--once|--publish-bootstrap|Repetition|Gateway\.Purview\.CatalogHost\.dll' -or
@@ -163,4 +170,4 @@ if ($catalogHostProject -notmatch '<OutputType>WinExe</OutputType>' -or $catalog
     throw 'Purview listener apphost must use the Windows GUI subsystem so Task Scheduler cannot open a console window.'
 }
 
-'Runtime Purview tenant, exact role/member boundary, logon-only listener, initial publication and reconciliation checks passed (no network).'
+'Runtime Purview tenant, exact role/member boundary, windowless supervised listener, initial publication and reconciliation checks passed (no network).'

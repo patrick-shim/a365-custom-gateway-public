@@ -123,7 +123,7 @@ configuration.
 Purview has two independent paths:
 
 - **Management:** a Windows certificate-backed listener reads existing policies
-  and applies reviewed individual-agent targets. Bootstrap installs a logon-only
+  and applies reviewed individual-agent targets. Bootstrap installs a supervised background
   task under the certificate-owning user. After the initial verified catalog,
   only explicit Connect, Reconnect, Manual sync, or assignment operations contact
   the management provider.
@@ -262,9 +262,11 @@ Compose profile.
 The Purview catalog host stays running in the background while its certificate-owning
 Windows user is signed in. It is a windowless executable, starts automatically at
 that user's Windows sign-in, and launches provider PowerShell processes without
-console windows. It has no recurring one-minute launch or automatic catalog refresh.
-Task Scheduler retries a crashed listener up to three times at one-minute intervals;
-continued failures require repair through the Console's connection diagnostics.
+console windows. A one-minute Task Scheduler recovery trigger starts the same
+windowless listener only when it is not already running; duplicate starts are
+ignored. This does not launch a PowerShell window or refresh the catalog. Native
+failure retries are also configured. Persistent failures require repair through
+the Console's connection diagnostics.
 The Console reports its heartbeat, so a separate tray application is unnecessary.
 After restarting Windows, sign in to that account to restore the connector. Signing
 out stops this user-scoped component; Docker runtime protection is independent of
@@ -287,7 +289,10 @@ catalog-host liveness. See [runtime operations](docs/runtime/README.md#quiet-bac
    unchanged settings; it does not promise future availability or downstream
    Microsoft visibility.
 
-For an already assigned policy, **Verify protection** runs the same checks without
+**Checks not yet passed** means normal-allow and DLP-block evidence is incomplete;
+it does not mean DLP is off or that a background verification job is running.
+
+For an already assigned policy, **Run protection checks** runs the same checks without
 reapplying it. Verification stays in the open browser flow; closing it cancels
 remaining checks and clears entered credentials. Accepted assignments continue on
 the server. An unavailable or unknown result stops verification with recovery

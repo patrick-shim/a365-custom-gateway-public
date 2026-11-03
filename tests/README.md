@@ -67,7 +67,7 @@ no-catalog disconnection, and liveness-only recovery without a provider read.
 
 `bootstrap/tests/Runtime.Purview.Tests.ps1` verifies exact owned-task migration,
 one bootstrap catalog read/publication, stable connector identity and transport
-key, a single logon-only listener trigger, no periodic catalog action, and listener
+key, logon and recovery triggers for one windowless listener, no periodic catalog action, and listener
 restart settings without contacting a tenant. Console tests verify that status GET
 and page mount create no operation, mutation headers are exact, duplicate actions
 stay disabled, bounded polling stops, previous catalog state survives failure, and

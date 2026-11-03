@@ -380,7 +380,7 @@ export function AgentDataProtection({
               {x.status === "Assigned" && x.assignedAtUtc && (
                 <Caption1>
                   Purview assignment confirmed {new Date(x.assignedAtUtc).toLocaleString()}. Choose
-                  Verify protection to check current runtime outcomes.
+                  Run protection checks to check current runtime outcomes.
                 </Caption1>
               )}
               {x.failureCode === "ASSIGNMENT_RESULT_INVALID" ? (
@@ -429,7 +429,7 @@ export function AgentDataProtection({
               : needsAttention
                 ? "NeedsAttention"
                 : state?.bindingCurrent
-                  ? "VerificationRequired"
+                  ? "ChecksNotYetPassed"
                   : state?.items.length
                     ? "Unconfirmed"
                     : "NotConfigured"
@@ -441,7 +441,7 @@ export function AgentDataProtection({
             : needsAttention
               ? "One or more saved assignments need review before enforcement can be verified"
               : state?.bindingCurrent
-                ? "Assignment confirmed. Run verification to check protection; no verification is running automatically."
+                ? "Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically."
                 : state?.items.length
                   ? "Enforcement readiness not confirmed · protected requests fail closed"
                   : `Gateway content evaluation: ${evaluationLabel(agent.features?.purviewEnabled)}`}
@@ -453,7 +453,7 @@ export function AgentDataProtection({
           }
           onClick={() => setVerification({})}
         >
-          Verify protection
+          Run protection checks
         </Button>
         {state?.allowObservedAtUtc && (
           <Caption1>

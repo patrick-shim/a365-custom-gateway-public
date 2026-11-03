@@ -21,7 +21,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for review and validation practices.
 | M2 — Windows connector | Certificate-backed listener, authenticated commands/results, heartbeat, bounded provider work, replay rejection, and assignment readback | [Catalog host](docs/architecture/purview-catalog-host.md) |
 | M3 — Management API | Connect, Reconnect, Manual sync, operation polling, audit, reconciliation, and sanitized failures | [API contract](docs/api/api-contract.md) |
 | M4 — Console | Connection diagnostics, explicit management actions, persistent cached selection, authoritative polling, accessible progress, and reviewed individual assignments | [Console design](docs/console/design.md) |
-| M5 — Bootstrap and recovery | Shared terminal/React setup, owned-resource migration, logon-only supervision, retained credentials, and durable recovery | [Bootstrap](bootstrap/README.md), [Runtime](docs/runtime/README.md) |
+| M5 — Bootstrap and recovery | Shared terminal/React setup, owned-resource migration, windowless background supervision, retained credentials, and durable recovery | [Bootstrap](bootstrap/README.md), [Runtime](docs/runtime/README.md) |
 
 The local implementation has offline regression coverage. Passing those checks
 does not establish live tenant enforcement, Windows restart recovery, Docker
@@ -51,20 +51,23 @@ restart recovery, or downstream Microsoft-service visibility.
 
 ## Beta protection setup
 
-The current beta adds explicit browser-scoped Apply and verify and Verify protection
+The current beta adds explicit browser-scoped Apply and verify and Run protection checks
 runs using existing reviewed assignment and prompt-evaluation contracts. Bounded
 progress, cancellation, expected provider-specific blocks, current-state readback,
-and request-scoped credentials are acceptance gates. No service-hosting or M6
-connector changes are included. Source-revision labels allow comparison between
+and request-scoped credentials are acceptance gates. Missing successful test
+evidence is explicitly distinguished from assignment and active background work.
+No service-hosting or M6 connector changes are included. Source-revision labels allow comparison between
 public source and local application images.
 
 ## Windows background lifetime
 
 The supported beta already uses a windowless executable supervised by a single
-Windows sign-in task. It stays running without a repeating launch timer, keeps
-provider PowerShell children invisible and exposes liveness in the Console.
-Failure retries are bounded; permanent certificate or configuration errors require
-repair. This user-session background lifetime is the accepted local experience.
+Windows task with logon and one-minute recovery triggers. IgnoreNew prevents
+duplicate processes while it runs; a stopped listener is restarted without a
+visible window. Provider PowerShell children are invisible and liveness appears
+in the Console. Recovery does not create provider work; permanent certificate or
+configuration errors still require repair. This user-session background lifetime
+is the accepted local experience.
 An always-on service before Windows sign-in remains deferred with M6 below.
 
 ## M6 — Server/cloud connector (deferred)

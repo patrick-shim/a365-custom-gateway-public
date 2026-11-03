@@ -37,6 +37,9 @@ content submissions and uncertain mutations are never automatically retried.
 Closing/unmounting cancels browser verification, releases keys and cannot undo an
 accepted durable assignment. Reopening requires an explicit fresh run. Historical
 allow/block observations are displayed as evidence, not an active validation job.
+Missing allow/block evidence is labeled Checks not yet passed. This describes
+missing successful outcomes, not disabled protection or a background job. The
+screen names the normal-allow and synthetic-DLP-block requests that are required.
 New verification does not require management availability for an already confirmed
 assignment. New assignments retain connector readiness checks and reviewed writes.
 Public UI/source documentation consistently uses Beta as the release channel.
@@ -48,9 +51,12 @@ owned Microsoft resources.
 ### Quiet background connector
 
 The Windows Purview catalog host is a continuously running, windowless executable
-under the certificate-owning user's interactive Windows session. Its single logon
-trigger has no repetition schedule; Task Scheduler ignores duplicate starts, permits
-an unlimited running lifetime and retries failures three times one minute apart.
+under the certificate-owning user's interactive Windows session. A logon trigger
+and a one-minute recovery trigger target the same windowless executable. Task
+Scheduler ignores duplicate starts and permits an unlimited running lifetime; the
+recovery trigger restores a stopped listener even when native failure retries do
+not run. Native retries remain configured three times one minute apart. Recovery
+never starts a separate shell or creates a provider refresh.
 Provider children run with no console window and non-interactive authentication.
 Idle heartbeat is not a catalog refresh. A separate tray interface or Windows service
 is not required. The Console is the management and liveness surface. Recovery must

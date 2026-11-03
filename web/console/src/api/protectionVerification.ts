@@ -150,7 +150,7 @@ export async function verifyProtection(
       );
       requireState(
         Date.now() < deadline,
-        "Assignment is still unconfirmed. Verification has stopped; accepted assignment work continues. Check assignment status, then choose Verify protection. Do not reapply it blindly.",
+        "Assignment is still unconfirmed. Verification has stopped; accepted assignment work continues. Check assignment status, then choose Run protection checks. Do not reapply it blindly.",
       );
       await pause(signal);
     }

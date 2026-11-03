@@ -105,7 +105,7 @@ before import.
 During a clean or migrated bootstrap, the catalog already read and verified by
 bootstrap is handed to the listener publication path. Bootstrap does not perform a
 second catalog read merely to seed PostgreSQL. It replaces the exact owned previous
-task with one logon-only listener task under the certificate-owning Windows user.
+task with one windowless listener task with logon and recovery triggers under the certificate-owning Windows user.
 That task has no recurring catalog-read trigger and opens no visible terminal.
 
 The current local profile still depends on that user signing in. Pre-logon service
@@ -247,7 +247,7 @@ Repository and offline tests cover:
 - assignment reconciliation to `NeedsAttention` and protection-revision change;
 - Console six-state rendering, duplicate submission control, terminal/stalled
   polling, and stable page content;
-- bootstrap publication, exact-task migration, a single logon-only trigger, and
+- bootstrap publication, exact-task migration, logon and idle-only recovery triggers, and
   absence of a periodic catalog action.
 
 These tests do not prove a live tenant catalog read, live per-agent policy mutation,

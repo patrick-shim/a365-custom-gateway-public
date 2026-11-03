@@ -30,7 +30,7 @@ Do not delete active state to perform a source cleanup or normal rebuild. Missin
 2. Complete the signed-in administrator's Registry confirmation when requested. Console sign-in does not replace tenant consent to the API's delegated Registry permissions.
 3. Wait for the authoritative Active readback; save the one-time agent key securely.
 4. On the agent's Protection setup tab, enable Prompt Shields and review an existing compatible Purview policy for its exact individual identity.
-5. Choose Apply and verify with the matching agent key, test-user object ID and an approved synthetic DLP sample. For existing assignments, choose Verify protection. Check sibling scope independently. An assignment write alone is not evidence of blocking.
+5. Choose Apply and verify with the matching agent key, test-user object ID and an approved synthetic DLP sample. For existing assignments, choose Run protection checks. Check sibling scope independently. An assignment write alone is not evidence of blocking.
 
 Prompt Shields is an independent per-agent choice. Connection diagnostics are under Settings. Classifiers, rules, exclusions and policy authoring remain in Purview.
 
@@ -56,9 +56,11 @@ The Windows catalog host is a windowless `.exe`, not a recurring PowerShell task
 It stays running under the certificate-owning Windows user, starts at that user's
 sign-in, and permits only one task instance. Provider children use non-interactive
 PowerShell with `CreateNoWindow`; they do not open terminals or request browser
-sign-in. An idle listener publishes local heartbeat only. Its one-minute Task
-Scheduler interval applies only to crash recovery (up to three retries), not to
-routine launches or catalog refreshes. The task's `Hidden` setting controls its
+sign-in. An idle listener publishes local heartbeat only. A one-minute recovery
+trigger asks Task Scheduler to start the windowless listener only if it is stopped;
+IgnoreNew prevents duplicate processes. This also covers termination that does not
+activate native failure retries. It never triggers a catalog refresh or starts a
+separate shell. Native restart-on-failure remains configured for three retries. The task's `Hidden` setting controls its
 visibility in Task Scheduler; it is not what prevents terminal windows.
 
 Use the Console's **Purview connection** page to monitor liveness. Closing the

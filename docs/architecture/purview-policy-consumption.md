@@ -92,7 +92,7 @@ not a mutable transport file. Failed refreshes preserve the previous snapshot an
 never publish successful empty data. No management private key or administrator
 token is copied to the Linux API.
 
-Bootstrap starts the listener through a logon-only task under the certificate-
+Bootstrap starts the listener through a windowless supervised task under the certificate-
 owning account. Idle heartbeat and local polling, page/GET access, elapsed time,
 and API, Docker, or listener restart do not create a provider read. Restart
 recovery may resume an already accepted, unexpired operation. A service-managed or

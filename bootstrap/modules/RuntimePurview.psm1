@@ -333,10 +333,14 @@ function Start-RuntimePurviewCatalogHost {
     $arguments = @("`"$identityPath`"", "`"$directory`"", "`"$connector`"", "`"$queue`"", "`"$keyPath`"")
     $action = New-ScheduledTaskAction -Execute $executable -Argument ($arguments -join ' ') -WorkingDirectory $root
     $logonTrigger = New-ScheduledTaskTrigger -AtLogOn -User $account
+    # Native failure retries do not cover every external termination. IgnoreNew
+    # makes this a liveness guard: a healthy windowless listener is left running,
+    # and a replacement resumes only accepted work without refreshing Purview.
+    $recoveryTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
     $principal = New-ScheduledTaskPrincipal -UserId $account -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $logonTrigger -Principal $principal -Settings $settings `
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($logonTrigger, $recoveryTrigger) -Principal $principal -Settings $settings `
         -Description $listenerDescription -Force | Out-Null
     Start-ScheduledTask -TaskName $taskName
     return [ordered]@{

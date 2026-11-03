@@ -775,7 +775,7 @@ describe("Console routes with actual API envelopes", () => {
     await user.click(screen.getByRole("button", { name: "Check assignment status" }));
     expect(await screen.findByText("Assigned", { exact: true })).toBeVisible();
     expect(screen.queryByRole("progressbar", { name: "Applying assignment" })).not.toBeInTheDocument();
-    expect(screen.getByText("Assignment confirmed. Run verification to check protection; no verification is running automatically.")).toBeVisible();
+    expect(screen.getByText("Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically.")).toBeVisible();
     expect(server.requests.filter(x => x.method === "POST")).toHaveLength(2);
   });
 
@@ -930,7 +930,7 @@ describe("Console routes with actual API envelopes", () => {
       allowObservedAtUtc: new Date().toISOString(), blockObservedAtUtc: null,
       items: [{ operationId, policyId: operationId, policyName: "Existing DLP", status: "Assigned", failureCode: null, assignedAtUtc: new Date().toISOString() }] }));
     renderApp(`/agents/${agentId}?tab=data-protection`);
-    expect(await screen.findByText("Assignment confirmed. Run verification to check protection; no verification is running automatically.")).toBeVisible();
+    expect(await screen.findByText("Policy assigned. A normal allowed request and a synthetic DLP-blocked request have not both been observed under the current settings. Run protection checks below; no test is running automatically.")).toBeVisible();
     expect(screen.queryByText("Allow and DLP block observed under the current configuration")).not.toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@ const toneByValue: Record<string, Tone> = {
   Succeeded: "success",
   Verified: "success",
   EvidenceObserved: "informative",
-  VerificationRequired: "warning",
+  ChecksNotYetPassed: "warning",
   Assigned: "success",
   Allowed: "success",
   Deleted: "success",

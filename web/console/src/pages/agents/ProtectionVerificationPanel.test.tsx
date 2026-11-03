@@ -41,7 +41,7 @@ async function enterInput() {
     screen.getByLabelText("Approved synthetic DLP sample"),
     "approved synthetic sample",
   );
-  expect(screen.getByRole("button", { name: "Start verification" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Run protection checks" })).toBeDisabled();
   await user.click(screen.getByRole("checkbox"));
   return user;
 }
@@ -55,7 +55,7 @@ it("requires approved synthetic content and clears credentials before verificati
       }),
   );
   const user = await enterInput();
-  await user.click(screen.getByRole("button", { name: "Start verification" }));
+  await user.click(screen.getByRole("button", { name: "Run protection checks" }));
   expect(screen.getByLabelText("Registered API key")).toHaveValue("");
   expect(screen.getByRole("button", { name: "Verifying protection…" })).toBeDisabled();
   expect(verifyProtection).toHaveBeenCalledWith(
@@ -83,7 +83,7 @@ it("closing cancels the active run and never starts another submission", async (
       ),
   );
   const user = await enterInput();
-  await user.click(screen.getByRole("button", { name: "Start verification" }));
+  await user.click(screen.getByRole("button", { name: "Run protection checks" }));
   const signal = vi.mocked(verifyProtection).mock.calls[0][1];
   await user.click(screen.getByRole("button", { name: "Close protection verification" }));
   expect(signal.aborted).toBe(true);

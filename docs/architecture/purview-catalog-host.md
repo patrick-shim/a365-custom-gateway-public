@@ -9,8 +9,10 @@ the management credential or create DLP policies, rules, classifiers, or SITs.
 ## Lifecycle
 
 Task Scheduler starts one listener when the certificate-owning user signs in. The
-task has no repeating trigger and runs with no execution-time limit; Task
-Scheduler restarts a failed listener up to three times. The listener publishes an
+task runs with no execution-time limit. A one-minute recovery trigger targets the
+same windowless executable, with IgnoreNew preventing duplicate instances. This
+restores a terminated listener even if native failure retries do not activate;
+Task Scheduler also retains three restart-on-failure attempts. The listener publishes an
 authenticated heartbeat while idle and polls only local connector and assignment
 directories. Idle polling, heartbeat, elapsed time, page loads, GET requests, and
 ordinary API, Docker, or listener restarts do not create provider work. Restart

@@ -107,7 +107,7 @@ export function ProtectionVerificationPanel({ agent, review, onClose, onFinished
             </Button>
           }
         >
-          {review ? "Apply and verify" : "Verify protection"} · Beta
+          {review ? "Apply and verify" : "Run protection checks"} · Beta
         </DrawerHeaderTitle>
       </DrawerHeader>
       <DrawerBody style={{ display: "grid", gap: 16, alignContent: "start", paddingBottom: 24 }}>
@@ -181,7 +181,7 @@ export function ProtectionVerificationPanel({ agent, review, onClose, onFinished
           }
           onClick={() => void run()}
         >
-          {busy ? "Verifying protection…" : review ? "Apply and verify" : "Start verification"}
+          {busy ? "Verifying protection…" : review ? "Apply and verify" : "Run protection checks"}
         </Button>
         {expired && !busy && !result && (
           <Text role="alert">
@@ -220,7 +220,7 @@ export function ProtectionVerificationPanel({ agent, review, onClose, onFinished
               {result.outcome !== "Ready" && (
                 <Text>
                   Close this panel, follow the failed step's recovery instructions, and choose
-                  Verify protection for a new run.
+                  Run protection checks for a new run.
                 </Text>
               )}
             </Card>
